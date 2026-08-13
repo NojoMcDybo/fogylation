@@ -61,12 +61,11 @@ body.dragging, body.dragging *{
   -webkit-overflow-scrolling:touch; will-change:transform;
   display:flex; justify-content:center;
 }
-.page{--off:0px; padding-right:calc(var(--off)*2)}
 .page > .inner{width:100%; max-width:460px; padding:0 20px}
 .page.snap{transition:transform .56s var(--spring), opacity .56s var(--spring), filter .56s var(--spring)}
 .page.snap, body.dragging .page{will-change:transform, filter}
-#pSim{box-shadow:var(--shPage); border-radius:26px 0 0 26px; z-index:2; --off:26px}
-#pRev{box-shadow:var(--shPage); border-radius:26px 0 0 26px; z-index:4; --off:26px}
+#pSim{box-shadow:var(--shPage); border-radius:26px 0 0 26px; z-index:2}
+#pRev{box-shadow:var(--shPage); border-radius:26px 0 0 26px; z-index:4}
 #fogSim{z-index:3} #fogRev{z-index:5}
 #pHome{z-index:1}
 .fog{
@@ -219,8 +218,14 @@ html[data-theme="dark"] .tgl .moon{color:var(--paper)}
 }
 .value.pulse{animation:tick .6s var(--spring)}
 @keyframes tick{0%{transform:scale(1);opacity:.5}36%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
-.arrowbox{width:32px;height:32px;position:relative}
-.arrowbox svg{position:absolute;inset:0;width:32px;height:32px;transition:transform .9s var(--spring),color 1.2s linear}
+.arrowbox{display:flex; align-items:center; justify-content:center; gap:0; height:32px}
+.arw{
+  width:32px; height:32px; flex:0 0 auto;
+  transition:transform .9s var(--spring), color 1.2s linear,
+             width .38s var(--spring), opacity .38s var(--spring), margin .38s var(--spring);
+}
+.arw.two{width:0; opacity:0; margin-left:0}
+.arrowbox.dbl .arw.two{width:26px; opacity:1; margin-left:-4px}
 .unit{font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink3); margin-top:13px}
 .behind{font-size:12.5px; color:var(--ink3); margin-top:5px}
 
@@ -259,6 +264,34 @@ canvas{width:100%; height:206px; display:block; touch-action:pan-y}
   font-size:12.5px; color:var(--ink2);
 }
 .loadrow .load i{height:16px; width:5px}
+
+/* ─── Rückmeldung ─── */
+.toast{
+  position:fixed; left:50%; bottom:calc(62px + env(safe-area-inset-bottom));
+  z-index:35; pointer-events:none;
+  display:flex; align-items:center; gap:9px;
+  padding:11px 17px; border-radius:99px;
+  background:var(--ink); color:var(--paper);
+  font-family:var(--mono); font-size:12.5px; letter-spacing:.02em;
+  box-shadow:0 8px 26px rgba(0,0,0,.28);
+  transform:translate(-50%, 16px) scale(.9); opacity:0;
+  transition:transform .42s var(--spring), opacity .34s var(--spring);
+}
+.toast.on{transform:translate(-50%, 0) scale(1); opacity:1}
+.toast svg{width:15px; height:15px; flex:0 0 auto}
+
+@keyframes ping{
+  0%{transform:scale(1)}
+  28%{transform:scale(1.055)}
+  100%{transform:scale(1)}
+}
+.ping{animation:ping .7s var(--spring)}
+@keyframes edge{
+  0%{box-shadow:inset 0 0 0 0 var(--ink), var(--sh)}
+  30%{box-shadow:inset 0 0 0 2px var(--ink), var(--sh)}
+  100%{box-shadow:inset 0 0 0 0 var(--ink), var(--sh)}
+}
+.edge{animation:edge .9s var(--spring)}
 
 /* ─── Zustandschips ─── */
 .chips{
@@ -495,7 +528,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
       <div class="tile"><div class="k">KE-Faktor</div><div class="v">10 g/U</div></div>
       <div class="tile"><div class="k">Korrektur</div><div class="v">35 mg/dL</div></div>
       <div class="tile"><div class="k">Zielbereich</div><div class="v">70–180</div></div>
-      <div class="tile"><div class="k">Basal</div><div class="v">0.9 U/h</div></div>
+      <div class="tile"><div class="k">Basal</div><div class="v">0.90 U/h</div></div>
     </div>
     <div class="warnbox"><b>Lernwerkzeug, kein Medizinprodukt.</b> Die Werte sind simuliert und taugen nicht für reale Therapieentscheidungen. Kein Bolusrechner.</div>
 
@@ -541,8 +574,11 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
       </div>
       <div class="valrow">
         <span class="value" id="bg">110</span>
-        <span class="arrowbox">
-          <svg id="arrow" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <span class="arrowbox" id="arrowbox">
+          <svg class="arw" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 26V7M16 7l-6.5 6.5M16 7l6.5 6.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="arw two" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M16 26V7M16 7l-6.5 6.5M16 7l6.5 6.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
@@ -580,6 +616,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
       <button class="btn" id="btnMeal">Essen</button>
       <button class="btn" id="btnBolus">Insulin</button>
       <button class="btn soft wide" id="btnMove">Bewegung starten</button>
+      <button class="btn line wide" id="btnBasal">Basalrate · 0.90 U/h</button>
     </div>
 
     <div class="move" id="moveCard">
@@ -645,6 +682,8 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
     <svg class="i moon" viewBox="0 0 20 20" fill="none"><path d="M16.8 12.4A7.3 7.3 0 017.6 3.2a7.3 7.3 0 109.2 9.2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
   </button>
 </div></div>
+
+<div class="toast" id="toast" aria-live="polite"></div>
 
 <div id="rail">
   <button data-p="0" aria-current="true" aria-label="Start"><i></i></button>
@@ -714,6 +753,23 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
   </div>
 </div></div>
 
+<!-- ══════════ SHEET: BASAL ══════════ -->
+<div class="sheet" id="sheetBasal"><div class="panel">
+  <div class="grab"></div>
+  <h3>Basalrate</h3>
+  <div class="field">
+    <label><span>Eingestellt</span><b><span id="baSet">0.90</span> U/h</b></label>
+    <input type="range" id="basalR" min="0.30" max="1.80" step="0.05" value="0.90">
+  </div>
+  <p class="split" id="basalTxt"></p>
+  <p class="hint">Basal deckt den Grundbedarf zwischen den Mahlzeiten. Zu wenig, und der Wert steigt langsam und dauerhaft. Zu viel, und er sinkt — auch nachts, wenn du schläfst.</p>
+  <p class="hint">Die Umstellung braucht Stunden und lässt sich nicht zurückholen. Das ist keine Einstellung, die man zwischendurch dreht.</p>
+  <div class="row2">
+    <button class="btn soft" data-close>Zurück</button>
+    <button class="btn" id="basalOK">Übernehmen</button>
+  </div>
+</div></div>
+
 <!-- ══════════ SHEET: INSULIN ══════════ -->
 <div class="sheet" id="sheetBolus"><div class="panel">
   <div class="grab"></div>
@@ -779,11 +835,14 @@ const P = {
   Vg:144.0, Vi:10.8, ke:0.138, tau_i:44.0, p2:0.055, SI:6.0572e-4,
   p1:0.0006, Gb:110.0, EGPb:1.30, kL:180.0, kR:0.005,
   kCR:0.008, Gcr:112.0, CRmax:0.50, Ksat:100.0, Ag:0.85,
-  tau_sens:12.0, basal:0.9/60,
+  tau_sens:12.0,
+  basalRef:0.9/60,   // die korrekt titrierte Rate -- Bezugspunkt der Bilanz
+  tauBasal:180.0,    // Langzeitinsulin stellt sich langsam um
+  dawnA:0.26,       // Amplitude des Dawn-Phaenomens
 
   // Grundumsatz im Wachzustand. Deshalb sinkt der Wert tagsueber von
   // selbst und flacht nachts ab -- nicht wegen eines Zufallsrauschens.
-  kBase:0.0011,
+  kBase:0.0008,
 
   // Bewegung
   kWork:0.040,   // Muskelverbrauch waehrend der Belastung
@@ -840,11 +899,12 @@ const KOMBIS = {
 class Engine {
   constructor(seed = 20260812){
     this.rng = makeRNG(seed);
-    const Ib = P.basal*1000/(P.Vi*P.ke);
+    const Ib = P.basalRef*1000/(P.Vi*P.ke);
     this.s = {
       t: 7*60,
       D1:0, D2:0, tau_m:40, B1:0, B2:0,
-      S1:P.basal*P.tau_i, S2:P.basal*P.tau_i, Ip:Ib, Ib, X:0,
+      S1:P.basalRef*P.tau_i, S2:P.basalRef*P.tau_i, Ip:Ib, Ib, X:0,
+      basalSet:0.9, basalEff:0.9,   // U/h, gesetzt und tatsaechlich wirksam
       Z:0, Q1:0, Q2:0, Q3:0,            // Nachwirkung, erste und zweite Welle
       gly:1,                             // Leberglykogen
       haaf:0,                            // Gedaechtnis kuerzlicher Hypoglykaemien
@@ -912,6 +972,11 @@ class Engine {
     const gTrue = Math.max(0, gEst*Math.exp(0.24*this.rng.normal() + 0.06));
     this.meals.push({tEnd:this.s.t + dur, dur, gTrue, gEst, tau:MEAL_TYPES[type].tau});
     this.events.push({t:this.s.t, kind:"meal", est:gEst, truth:gTrue, type, dur});
+  }
+  setBasal(rate){
+    if (Math.abs(rate - this.s.basalSet) < 0.001) return;
+    this.events.push({t:this.s.t, kind:"basal", from:this.s.basalSet, to:rate});
+    this.s.basalSet = rate;
   }
   /* Selbst gestartete Einheit. Sie kommt ohne Vorwarnung -- wer sich
      nicht vorher vorbereitet hat, muss waehrenddessen reagieren. */
@@ -1042,7 +1107,11 @@ class Engine {
     const Ra = P.Ag*s.D2/s.tau_m/P.Vg;
 
     /* ── Insulin ── */
-    let u = P.basal;
+    /* Basal stellt sich nur langsam um. Was du einstellst, wirkt erst in
+       Stunden vollstaendig -- und laesst sich genauso wenig zurueckholen.
+       Zu wenig Basal heisst: der Wert steigt langsam und dauerhaft. */
+    s.basalEff += (s.basalSet - s.basalEff)/P.tauBasal;
+    let u = s.basalEff/60;
     if (this._bolus){ u += this._bolus; this._bolus = 0; }
     for (const e of this._ext) if (t < e.until) u += e.rate;
     if (this._ext.length) this._ext = this._ext.filter(e => t < e.until);
@@ -1052,14 +1121,26 @@ class Engine {
     s.X  += -P.p2*s.X + P.p2*P.SI*(s.Ip - s.Ib);
 
     /* ── Zirkadiane Schwingung, Mittelwert null ueber 24 h ── */
-    const amp  = 0.075*(1 + 0.28*Math.sin(day*2.399 + 1.1)) * (K.morgenwand ? 1.7 : 1);
-    const dawn = amp*Math.sin(2*Math.PI*(h + 1)/24);
+    /* Dawn-Phaenomen: Wachstumshormon und Cortisol kurbeln die
+       hepatische Glukoseabgabe in den letzten Schlafstunden an. Es ist
+       kein Rauschen und keine Schwingung um null, sondern ein echter
+       Anstieg zwischen etwa halb drei und neun, Maximum gegen sechs.
+       Wer die Basalrate danach ausrichtet, riskiert nachts eine Hypo --
+       wer es nicht tut, wacht jeden Morgen zu hoch auf. */
+    let dawn = 0;
+    if (h > 2.5 && h < 9){
+      const x = (h - 2.5)/6.5;
+      dawn = P.dawnA*Math.pow(Math.sin(Math.PI*x), 1.6)
+           * (1 + 0.28*Math.sin(day*2.399 + 1.1))
+           * (K.morgenwand ? 1.7 : 1);
+    }
+    this._dawn = dawn;
 
     /* ── Modifikatoren, multiplikativ und voneinander abhaengig ── */
     const sens = (1 + P.kSens*s.Z + P.kLate*s.Q3*(K.doppelrisiko ? 1.5 : 1))
                * (1 - 0.24*s.stress) * (1 - 0.20*s.sleepDebt)
                * (1 - 0.34*s.ill) * (K.ketonrisiko ? 0.75 : 1);
-    const egpM = (0.78 + 0.22*s.gly)
+    const egpM = (0.90 + 0.10*s.gly)
                * (1 + 0.20*s.stress + 0.25*s.ill)
                * (1 - 0.30*s.alc);
     const crM  = (0.18 + 0.82*s.gly) * (1 - 0.65*s.haaf)
@@ -1155,6 +1236,7 @@ class Engine {
     const s = this.s, h = (s.t/60) % 24, out = [];
     const add = (k,v,txt) => { if (v > 0.12) out.push({k, v:Math.min(1,v), txt}); };
     if (h >= 23 || h < 6) out.push({k:"nacht", v:1, txt:"Nacht"});
+    if (this._dawn > 0.03) out.push({k:"dawn", v:Math.min(1, this._dawn/0.16), txt:"Dawn-Phänomen"});
     add("nach1", s.Z*1.2,            "Nachwirkung");
     add("nach2", s.Q3*2.0,           "Späte Welle");
     add("stress", s.stress,          "Stress");
@@ -1170,7 +1252,7 @@ class Engine {
     // Noch nicht abgegebenes Insulin aus verzoegerten Anteilen zaehlt mit,
     // sonst unterschaetzt man, was noch kommt.
     const pending = this._ext.reduce((a,e) => a + e.rate*Math.max(0, e.until - this.s.t), 0);
-    return Math.max(0, this.s.S1 + this.s.S2 - 2*P.basal*P.tau_i) + pending;
+    return Math.max(0, this.s.S1 + this.s.S2 - 2*(this.s.basalEff/60)*P.tau_i) + pending;
   }
   cob(){ return Math.max(0, (this.s.B1 + this.s.B2)/1000); }
   trend(){ const n=this.trace.length; return n<4?0:(this.trace[n-1].sensor-this.trace[n-4].sensor)/15; }
@@ -1205,28 +1287,25 @@ const LAST  = PAGES.length - 1;
 let page = 0, prog = 0;            // prog 0 = Home, 1 = Simulator
 let drag = null;
 
-const SLIVER = 26;   // px, die von der darunterliegenden Ebene stehen bleiben
+/* Die Ebenen ueberdecken sich vollstaendig. Was darunter liegt, bleibt
+   liegen -- nur die ankommende Seite bewegt sich. Dadurch wirkt der
+   Wechsel wie ein Blatt, das aufgelegt wird, nicht wie ein Karussell. */
 
 function applyProg(p){
   prog = p;
-  // Ebenenstapel: jede Seite legt sich ueber die vorige und laesst links
-  // einen Streifen frei. Was darunter liegt, verschwimmt -- sichtbar, aber
-  // nicht ablenkend, und man sieht sofort, wo es zurueckgeht.
   const w = pager.clientWidth || 1;
   PAGES.forEach((el, i) => {
-    const rest = i === 0 ? 0 : SLIVER;
     const d = p - i;
-    // Vor der Ankunft von rechts hereinschieben, danach den Streifen
-    // wieder abgeben, sobald die naechste Ebene sich darueberlegt.
-    const x = d <= 0 ? rest + (-d)*(w - rest) : rest*(1 - Math.min(d, 1));
-    const under = clamp(d, 0, 1);
+    // Ankommende Seiten schieben sich von rechts herein und decken die
+    // vorige vollstaendig ab. Alles darunter bleibt stehen und wird
+    // unscharf -- auch mehrere Ebenen tief, damit hinter der Auswertung
+    // weder Startseite noch Simulator scharf durchscheinen.
+    const x = d <= 0 ? (-d)*w : 0;
+    const under = clamp(d, 0, 2);
     if (i > 0) el.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
-    // Nur die unmittelbar darunterliegende Ebene wird unscharf gerechnet.
-    // Tiefere sind ohnehin verdeckt -- zwei gleichzeitige Vollbild-Weichzeichner
-    // waren die Ursache fuer das Ruckeln beim Wechsel zur Auswertung.
-    el.style.filter  = (under < .004 || d > 1.02) ? "none"
-                     : `blur(${(under*9).toFixed(2)}px)`;
-    el.style.opacity = String(1 - .28*Math.min(under, 1));
+    el.style.filter  = under < .004 ? "none"
+                     : `blur(${(Math.min(under, 1.35)*9).toFixed(2)}px)`;
+    el.style.opacity = String(1 - .26*Math.min(under, 1.4));
     el.style.pointerEvents = Math.round(clamp(p,0,LAST)) === i ? "auto" : "none";
     const f = FOGS[i];
     if (f){
@@ -1472,8 +1551,15 @@ function paint(tNow){
   // Der Pfeil zeigt nach oben bei Anstieg, nach unten bei Abfall und
   // waagerecht bei stabilem Verlauf -- so wie es jedes CGM handhabt.
   // Das SVG zeigt nach oben, deshalb der Versatz von 90 Grad.
-  $("arrow").style.transform = `rotate(${90 - clamp(eng.trend()*30, -90, 90)}deg)`;
-  $("arrow").style.color = tone;
+  // Waagerecht bei stabilem Verlauf, senkrecht bei starker Änderung.
+  // Ab 3 mg/dL pro Minute kommt ein zweiter Pfeil dazu -- CGM-Konvention.
+  const rate = eng.trend();
+  const deg = 90 - clamp(rate*30, -90, 90);
+  document.querySelectorAll(".arw").forEach(a => {
+    a.style.transform = `rotate(${deg}deg)`;
+    a.style.color = tone;
+  });
+  $("arrowbox").classList.toggle("dbl", Math.abs(rate) >= 3);
 
   const mins = Math.floor(tNow) % 1440, day = Math.floor(tNow/1440)+1;
   const hhmm = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
@@ -1492,7 +1578,7 @@ function paint(tNow){
   $("behind").textContent = uiFade > .4 ? "schwer zu lesen" : "dein Körper vor etwa zwölf Minuten";
 
   // Zustandsanzeigen brauchen keine 60 Bilder pro Sekunde.
-  if ((frame++ & 7) === 0){ paintMove(); paintReserve(); paintChips(); paintCrit(); }
+  if ((frame++ & 7) === 0){ paintMove(); paintReserve(); paintChips(); paintCrit(); paintBasal(); }
   viewH = lerp(viewH, rangeH, .12);
   if (prog > 0.02 && prog < LAST) drawChart($("chart"), eng.trace, viewH, tNow);
   // Erst wenn die Ebene wirklich steht, sonst faellt der Neuaufbau
@@ -1551,6 +1637,17 @@ function paintReserve(){
   $("resVal").textContent = pct + " %";
   $("resLabel").textContent = label;
 }
+
+let lastBasal = "";
+function paintBasal(){
+  const set = eng.s.basalSet, eff = eng.s.basalEff;
+  const key = set.toFixed(2) + "|" + eff.toFixed(2);
+  if (key === lastBasal) return;
+  lastBasal = key;
+  $("btnBasal").textContent = Math.abs(set - eff) < 0.02
+    ? `Basalrate · ${set.toFixed(2)} U/h`
+    : `Basalrate · ${eff.toFixed(2)} → ${set.toFixed(2)} U/h`;
+}
 let lastMoveHTML = "";
 function paintMove(){
   const a = eng.activity(), card = $("moveCard");
@@ -1608,6 +1705,7 @@ function renderLog(){
     if (e.kind === "bolus") return e.share >= 1
       ? `${e.units.toFixed(1)} U gespritzt`
       : `${e.units.toFixed(1)} U · ${Math.round(e.share*100)} % sofort, Rest über ${e.over} min`;
+    if (e.kind === "basal") return `Basal ${e.from.toFixed(2)} → ${e.to.toFixed(2)} U/h`;
     if (e.kind === "warn") return `${e.name} in ${e.inMin} min angekündigt`;
     if (e.kind === "emg") return e.name;
     if (e.kind === "state") return e.name;
@@ -1632,6 +1730,28 @@ function loop(ts){
 }
 
 /* ─── Sheets ──────────────────────────────────────────────────── */
+/* Kurze Bestaetigung. Ohne sie bleibt unklar, ob die Eingabe angekommen
+   ist -- die Wirkung setzt ja erst Minuten spaeter ein. */
+const ICON = {
+  meal:'<svg viewBox="0 0 16 16" fill="none"><path d="M3 1.5v5a2 2 0 002 2v6M5 1.5v4M11.5 1.5c-1 1.6-1.2 3.4-1 5.2.1.9.6 1.3 1.3 1.3H13v6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  bolus:'<svg viewBox="0 0 16 16" fill="none"><path d="M10.5 1.5L14.5 5.5M12.5 3.5L4 12l-2.5.5L2 10l8.5-8.5M8 6l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  move:'<svg viewBox="0 0 16 16" fill="none"><path d="M9 2.2a1 1 0 100 .1M6.5 14l1.2-3.6L5.5 9l.8-3.4L4 6.8 3 8.8M8.5 7.4l2.2 1 1.3 2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  basal:'<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8s4.2 4 4.2 6.7a4.2 4.2 0 11-8.4 0C3.8 5.8 8 1.8 8 1.8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+};
+let toastT = null;
+function toast(kind, text, cell){
+  const el = $("toast");
+  el.innerHTML = (ICON[kind] || "") + "<span>" + text + "</span>";
+  el.classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove("on"), 1900);
+  if (cell){
+    cell.classList.remove("edge"); void cell.offsetWidth; cell.classList.add("edge");
+  }
+  const v = $("bg");
+  v.classList.remove("ping"); void v.offsetWidth; v.classList.add("ping");
+}
+
 const closeSheets = () => document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on"));
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheets);
 document.querySelectorAll(".sheet").forEach(s => s.onclick = e => { if (e.target === s) closeSheets(); });
@@ -1674,14 +1794,43 @@ $("btnMove").onclick = guarded(() => {
   requestAnimationFrame(() => moveKnob($("moveInt")));
 });
 $("moveOK").onclick = () => {
-  eng.startActivity(moveInt, +$("moveDur").value);
+  const dur = +$("moveDur").value;
+  eng.startActivity(moveInt, dur);
   closeSheets(); renderLog();
+  toast("move", `${LOADWORD(moveInt)}, ${dur} min`, $("moveCard"));
 };
 
-$("btnRescue").onclick = guarded(() => { eng.logMeal(15,"fast",5); closeSheets(); renderLog(); });
+$("btnRescue").onclick = guarded(() => {
+  eng.logMeal(15,"fast",5); closeSheets(); renderLog();
+  toast("meal", "15 g Traubenzucker", $("cob").parentElement);
+});
 $("mealG").oninput = e => $("mG").textContent = e.target.value;
 $("mealD").oninput = e => $("mD").textContent = e.target.value;
-$("mealOK").onclick = () => { eng.logMeal(+$("mealG").value, mealType, +$("mealD").value); closeSheets(); renderLog(); };
+$("mealOK").onclick = () => {
+  const g = +$("mealG").value;
+  eng.logMeal(g, mealType, +$("mealD").value);
+  closeSheets(); renderLog();
+  toast("meal", `${g} g eingetragen`, $("cob").parentElement);
+};
+function paintBasalSheet(){
+  const r = +$("basalR").value, eff = eng.s.basalEff;
+  $("baSet").textContent = r.toFixed(2);
+  $("basalTxt").textContent = Math.abs(r - eff) < 0.02
+    ? `wirksam: ${eff.toFixed(2)} U/h`
+    : `wirksam gerade ${eff.toFixed(2)} U/h — stellt sich über etwa drei Stunden um`;
+}
+$("basalR").oninput = paintBasalSheet;
+$("btnBasal").onclick = guarded(() => {
+  $("basalR").value = eng.s.basalSet.toFixed(2);
+  paintBasalSheet();
+  $("sheetBasal").classList.add("on");
+});
+$("basalOK").onclick = () => {
+  const r = +$("basalR").value;
+  eng.setBasal(r); closeSheets(); renderLog();
+  toast("basal", `Basal ${r.toFixed(2)} U/h`, null);
+};
+
 let bolusShare = 1;
 function paintBolusSheet(){
   const U = +$("bolusU").value, over = +$("bolusOver").value;
@@ -1696,8 +1845,12 @@ wireSeg($("bolusSplit"), b => { bolusShare = +b.dataset.s; paintBolusSheet(); })
 $("bolusU").oninput = paintBolusSheet;
 $("bolusOver").oninput = paintBolusSheet;
 $("bolusOK").onclick = () => {
-  eng.injectBolus(+$("bolusU").value, bolusShare, +$("bolusOver").value);
+  const U = +$("bolusU").value;
+  eng.injectBolus(U, bolusShare, +$("bolusOver").value);
   closeSheets(); renderLog();
+  toast("bolus", bolusShare >= 1
+    ? `${U.toFixed(1)} U gespritzt`
+    : `${(U*bolusShare).toFixed(1)} U jetzt, Rest verzögert`, $("iob").parentElement);
 };
 
 /* ─── Auswertung ──────────────────────────────────────────────── */
@@ -1708,7 +1861,7 @@ function updateReview(){
   $("rTir").textContent = Math.round(tr.filter(p=>p.sensor>=70&&p.sensor<=180).length/n*100)+" %";
   $("rLow").textContent = Math.round(tr.filter(p=>p.G<70).length/n*100)+" %";
   $("rAvg").textContent = Math.round(tr.reduce((a,p)=>a+p.G,0)/n);
-  $("rDec").textContent = eng.events.filter(e => e.kind === "meal" || e.kind === "bolus").length;
+  $("rDec").textContent = eng.events.filter(e => e.kind === "meal" || e.kind === "bolus" || e.kind === "basal").length;
   $("rEmg").textContent = eng.events.filter(e => e.kind === "emg" && e.sev !== "ok").length;
   const mard = tr.reduce((a,p) => a + Math.abs(p.sensor - p.G)/p.G, 0)/n;
   $("rMard").textContent = (mard*100).toFixed(1) + " %";
@@ -1730,6 +1883,8 @@ function updateReview(){
       return `<li><b>${fmtT(e.t)}</b><span class="miss">${e.name}</span></li>`;
     if (e.kind === "state")
       return `<li><b>${fmtT(e.t)}</b><span>${e.name}</span></li>`;
+    if (e.kind === "basal")
+      return `<li><b>${fmtT(e.t)}</b><span>Basal ${e.from.toFixed(2)} → ${e.to.toFixed(2)} U/h</span></li>`;
     if (e.kind === "warn") return "";
     const p = Math.round((e.effective/e.units-1)*100);
     const cl = Math.abs(p) >= 15 ? ' class="miss"' : '';
@@ -1889,6 +2044,40 @@ requestAnimationFrame(loop);
 
    TRENDPFEIL -- Winkel nach CGM-Konvention, Rate in mg/dL pro Minute:
    +3 senkrecht hoch, 0 waagerecht, -3 senkrecht runter.
+
+   BASALRATE -- nuechtern 13 bis 19 Uhr, ausserhalb des Dawn-Fensters,
+   Reserven gefuellt, Rauschen deaktiviert:
+
+     0.55 U/h   +0.8 mg/dL pro Stunde   steigt langsam und dauerhaft
+     0.70 U/h   -0.2                    stabil
+     0.90 U/h   -1.4                    Ausgangswert
+     1.00 U/h   -4.2
+     1.15 U/h   -8.2                    Hypoglykaemie innerhalb eines Tages
+
+   Die Umstellung folgt der eingestellten Rate mit einer Zeitkonstante von
+   drei Stunden: nach einer Stunde ist etwa ein Drittel angekommen, nach
+   sechs Stunden gut vier Fuenftel. Das bildet Langzeitinsulin ab -- eine
+   einmal gesetzte Basalrate laesst sich nicht zurueckholen.
+
+   DAWN-PHAENOMEN -- nuechtern, korrekte Basalrate, 0 bis 9 Uhr:
+
+     01h 109   03h 108   05h 121   07h 147   09h 143
+     02h 108   04h 111   06h 135   08h 149
+
+   Anstieg vom naechtlichen Tiefpunkt bis zum Maximum: +42 mg/dL.
+   Wachstumshormon und Cortisol kurbeln die hepatische Glukoseabgabe in
+   den letzten Schlafstunden an. Das ist kein Rauschen und keine
+   Schwingung um null, sondern ein gerichteter Anstieg mit Maximum gegen
+   sechs Uhr.
+
+   Daraus folgt der eigentliche Zielkonflikt der Basalrate, gemessen
+   nuechtern von 22 bis 9 Uhr:
+
+     0.90 U/h   Nacht tiefster Wert 106   um 8 Uhr 132 mg/dL   morgens zu hoch
+     1.05 U/h   Nacht tiefster Wert  85   um 8 Uhr  93 mg/dL   bester Kompromiss
+     1.20 U/h   Nacht tiefster Wert  67   um 8 Uhr  95 mg/dL   nachts zu tief
+
+   Es gibt keine Rate, die beides loest. Genau das ist der Punkt.
 
    NICHT ENTHALTEN (bewusst, Phase 3): Herzfrequenz aus HealthKit statt
    simulierter Ereignisse, Koffein, Dehydratation, Pumpenmodus,

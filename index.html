@@ -1560,7 +1560,7 @@ wireSeg($("speed"), b => {
     toast("basal", "Reality-Modus beendet", null);
   }
 });
-$("realityNo").onclick = closeSheets;
+$("realityNo").onclick = () => closeSheets();
 $("realityYes").onclick = () => {
   eng.setReality(true); closeSheets(); renderLog();
   toast("move", "Reality — du planst selbst", $("moveCard"));

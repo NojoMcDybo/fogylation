@@ -265,6 +265,42 @@ canvas{width:100%; height:206px; display:block; touch-action:pan-y}
 }
 .loadrow .load i{height:16px; width:5px}
 
+/* ─── Nacht ─── */
+.night{
+  position:fixed; inset:0; z-index:70; background:#04080A; color:#E9EFEF;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  padding:32px 24px calc(32px + env(safe-area-inset-bottom));
+  animation:dim .9s var(--spring);
+}
+.night[hidden]{display:none}
+@keyframes dim{from{opacity:0}to{opacity:1}}
+.nclock{
+  font-family:var(--mono); font-size:74px; font-weight:300; letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums; color:#3B4A50; transition:color 1.2s linear;
+}
+.nhint{font-size:13.5px; color:#3B4A50; margin:14px 0 30px; max-width:26ch; line-height:1.5}
+.nrow{display:flex; gap:9px; justify-content:center}
+.night .btn{min-width:130px}
+.night .btn.line{box-shadow:inset 0 0 0 1.5px rgba(233,239,239,.16); color:#6E8087; min-width:76px}
+.night .btn.soft{background:rgba(233,239,239,.10); color:#C7D3D6}
+.alarmbox[hidden]{display:none}
+.alarmbox .avalue{
+  font-family:var(--mono); font-size:88px; font-weight:400; letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums; line-height:.9; margin-top:18px;
+}
+.alarmbox .aunit{font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#6E8087; margin-top:10px}
+.alarmbox .atext{font-size:15px; font-weight:700; margin:16px 0 26px; letter-spacing:-.01em}
+.night.lo .avalue,.night.lo .atext{color:#FF7063}
+.night.hi .avalue,.night.hi .atext{color:#E8B44A}
+.asig{display:flex; gap:7px; justify-content:center}
+.asig span{width:9px; height:9px; border-radius:99px; background:currentColor; animation:sig 1.1s ease-in-out infinite}
+.asig span:nth-child(2){animation-delay:.16s}
+.asig span:nth-child(3){animation-delay:.32s}
+.night.lo .asig{color:#FF7063} .night.hi .asig{color:#E8B44A}
+@keyframes sig{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+.night.ring{animation:ring .55s ease-in-out infinite alternate}
+@keyframes ring{from{background:#04080A}to{background:#120A0C}}
+
 /* ─── Rückmeldung ─── */
 .toast{
   position:fixed; left:50%; bottom:calc(62px + env(safe-area-inset-bottom));
@@ -617,6 +653,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
       <button class="btn" id="btnBolus">Insulin</button>
       <button class="btn soft wide" id="btnMove">Bewegung starten</button>
       <button class="btn line wide" id="btnBasal">Basalrate · 0.90 U/h</button>
+      <button class="btn soft wide" id="btnSleep">Schlafen gehen</button>
     </div>
 
     <div class="move" id="moveCard">
@@ -659,6 +696,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
     <div class="tile"><div class="k">Entscheidungen</div><div class="v" id="rDec">—</div></div>
     <div class="tile"><div class="k">Notfälle</div><div class="v" id="rEmg">—</div></div>
     <div class="tile"><div class="k">Sensorabweichung</div><div class="v" id="rMard">—</div></div>
+    <div class="tile"><div class="k">Nachtalarme</div><div class="v" id="rAlarm">—</div></div>
   </div>
   <div class="legend">
     <span><i style="background:var(--ink)"></i>Sensor — was du gesehen hast</span>
@@ -682,6 +720,27 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
     <svg class="i moon" viewBox="0 0 20 20" fill="none"><path d="M16.8 12.4A7.3 7.3 0 017.6 3.2a7.3 7.3 0 109.2 9.2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
   </button>
 </div></div>
+
+<div class="night" id="night" hidden>
+  <div class="nbody" id="nBody">
+    <div class="nclock" id="nClock">23:40</div>
+    <div class="nhint">Du schläfst. Der Sensor weckt dich, wenn es nötig wird.</div>
+    <div class="nrow">
+      <button class="btn line" id="btnTempo">60×</button>
+      <button class="btn soft" id="btnWake">Aufstehen</button>
+    </div>
+  </div>
+  <div class="alarmbox" id="alarmBox" hidden>
+    <div class="asig"><span></span><span></span><span></span></div>
+    <div class="avalue" id="aValue">62</div>
+    <div class="aunit">mg/dL · Sensor</div>
+    <div class="atext" id="aText">Tiefalarm</div>
+    <div class="nrow">
+      <button class="btn soft" id="btnSnooze">Weiterschlafen</button>
+      <button class="btn" id="btnAct">Aufstehen</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast" aria-live="polite"></div>
 
@@ -932,7 +991,8 @@ class Engine {
       gly:1,                             // Leberglykogen
       haaf:0,                            // Gedaechtnis kuerzlicher Hypoglykaemien
       stress:0, sleepDebt:0, ill:0, alc:0,
-      lowMin:0, highMin:0,               // Bilanz der Nacht
+      lowMin:0, highMin:0, wakeCost:0,    // Bilanz der Nacht
+      asleep:false, alarms:0,
       sensorDay:0,                       // Alter des Sensors in Tagen
       emg:null, emgT:0,
       G:110, Gi:110, noise:0, drift:0,
@@ -1010,6 +1070,14 @@ class Engine {
     this.meals.push({tEnd:this.s.t + dur, dur, gTrue, gEst,
                      tau:M.tau, fat:M.fat, prot:M.prot});
     this.events.push({t:this.s.t, kind:"meal", est:gEst, truth:gTrue, type, dur});
+  }
+  /* Der Sensor weckt bei Grenzueberschreitung. Wer weiterschlaeft,
+     riskiert mehr -- wer aufsteht, verliert Schlaf. Beides kostet. */
+  sleepAlarm(kind, value, snoozed){
+    this.s.alarms++;
+    this.s.wakeCost = Math.min(1, this.s.wakeCost + (snoozed ? 0.07 : 0.13));
+    this.events.push({t:this.s.t, kind:"alarm", low:kind === "low",
+                      value, snoozed: !!snoozed});
   }
   setReality(on){
     this.reality = on;
@@ -1126,7 +1194,10 @@ class Engine {
       if (s.G > 250) s.highMin++;
     }
     if (Math.round(h*60) === 7*60){
-      s.sleepDebt = Math.min(1, (s.lowMin/90)*0.7 + (s.highMin/180)*0.5);
+      /* Jeder naechtliche Alarm kostet Schlaf. Das zahlt man am Folgetag
+         mit hoeherer Insulinresistenz -- nicht in der Nacht selbst. */
+      s.sleepDebt = Math.min(1, (s.lowMin/90)*0.7 + (s.highMin/180)*0.5 + s.wakeCost);
+      s.wakeCost = 0;
       if (s.sleepDebt > 0.25)
         this.events.push({t, kind:"state", name:"Schlecht geschlafen", sev:"warn"});
       s.stress = Math.min(1, s.stress + 0.35*s.sleepDebt);
@@ -1339,6 +1410,7 @@ class Engine {
     const s = this.s, h = (s.t/60) % 24, out = [];
     const add = (k,v,txt) => { if (v > 0.12) out.push({k, v:Math.min(1,v), txt}); };
     if (this.reality) out.push({k:"reality", v:1, txt:"Reality", kombi:true});
+    if (s.asleep) out.push({k:"schlaf2", v:1, txt:"Schlaf"});
     if (h >= 23 || h < 6) out.push({k:"nacht", v:1, txt:"Nacht"});
     if (this._dawn > 0.03) out.push({k:"dawn", v:Math.min(1, this._dawn/0.16), txt:"Dawn-Phänomen"});
     add("fett", s.fatR*4,            "Fettresistenz");
@@ -1556,14 +1628,20 @@ wireSeg($("speed"), b => {
   }
   // Im Zeitraffer ergibt der Reality-Modus keinen Sinn -- er endet dann.
   if (speed > 1 && eng.reality){
-    eng.setReality(false); renderLog();
+    eng.setReality(false); anchor = null; renderLog();
     toast("basal", "Reality-Modus beendet", null);
   }
 });
 $("realityNo").onclick = () => closeSheets();
 $("realityYes").onclick = () => {
-  eng.setReality(true); closeSheets(); renderLog();
-  toast("move", "Reality — du planst selbst", $("moveCard"));
+  // Uhr auf die echte Tageszeit vorstellen. Nicht springen, sondern
+  // vorrechnen -- sonst passen Physiologie und Uhrzeit nicht zusammen.
+  const d = new Date(), real = d.getHours()*60 + d.getMinutes();
+  let delta = (real - (eng.s.t % 1440) + 1440) % 1440;
+  while (delta-- > 0) eng.step();
+  eng.setReality(true); setAnchor();
+  closeSheets(); renderLog(); lastCount = -1;
+  toast("move", `Reality — Uhr auf ${fmtT(eng.s.t)} gestellt`, $("moveCard"));
 };
 let mealType = "fast";
 wireSeg($("mealType"), b => mealType = b.dataset.t);
@@ -1835,6 +1913,7 @@ function renderLog(){
     if (e.kind === "bolus") return e.share >= 1
       ? `${e.units.toFixed(1)} U gespritzt`
       : `${e.units.toFixed(1)} U · ${Math.round(e.share*100)} % sofort, Rest über ${e.over} min`;
+    if (e.kind === "alarm") return `${e.low ? "Tiefalarm" : "Hochalarm"} bei ${e.value}${e.snoozed ? " — weitergeschlafen" : ""}`;
     if (e.kind === "basal") return `Basal ${e.from.toFixed(2)} → ${e.to.toFixed(2)} U/h`;
     if (e.kind === "warn") return `${e.name} in ${e.inMin} min angekündigt`;
     if (e.kind === "emg") return e.name;
@@ -1847,14 +1926,25 @@ function renderLog(){
     || `<li><b>—</b><span>noch nichts passiert</span></li>`;
 }
 
+/* Im Reality-Modus haengt die Simulationsuhr an der Systemuhr, nicht an
+   den Einzelbildern. Sonst bleibt sie stehen, sobald der Tab in den
+   Hintergrund geht -- und genau dann laesst man sie ja laufen. */
+let anchor = null;
+function setAnchor(){ anchor = {simT:eng.s.t, wall:Date.now()}; }
+
 function loop(ts){
   if (!lastTS) lastTS = ts;
   const dt = Math.min(250, ts - lastTS); lastTS = ts;
-  if (speed > 0){
+  if (eng.reality && anchor){
+    const want = anchor.simT + (Date.now() - anchor.wall)/60000;
+    let n = Math.min(400, Math.floor(want - eng.s.t));
+    while (n-- > 0) eng.step();
+  } else if (speed > 0){
     tSub += dt*speed/60000;
     let n = Math.min(320, Math.floor(tSub)); tSub -= n;
     while (n-- > 0) eng.step();
   }
+  if (asleep) paintNight();
   paint(eng.s.t + (speed > 0 ? tSub : 0));
   requestAnimationFrame(loop);
 }
@@ -1983,6 +2073,84 @@ $("bolusOK").onclick = () => {
     : `${(U*bolusShare).toFixed(1)} U jetzt, Rest verzögert`, $("iob").parentElement);
 };
 
+/* ─── Schlafen ─────────────────────────────────────────────────
+   Nachts sieht man nichts. Der Sensor ist die einzige Verbindung zum
+   eigenen Koerper -- und ob man auf ihn reagiert oder weiterschlaeft,
+   ist die Entscheidung, die den naechsten Tag praegt. */
+let asleep = false, snoozeUntil = -1e9, alarmOn = false, audio = null;
+const ALARM_LOW = 70, ALARM_HIGH = 250;
+
+function beep(){
+  try{
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume();
+    const t0 = audio.currentTime;
+    for (let k = 0; k < 3; k++){
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "square"; o.frequency.value = 1180;
+      g.gain.setValueAtTime(0.0001, t0 + k*0.34);
+      g.gain.exponentialRampToValueAtTime(0.10, t0 + k*0.34 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + k*0.34 + 0.20);
+      o.connect(g); g.connect(audio.destination);
+      o.start(t0 + k*0.34); o.stop(t0 + k*0.34 + 0.22);
+    }
+  }catch(e){}
+  if (navigator.vibrate) navigator.vibrate([220,110,220,110,420]);
+}
+
+function goSleep(){
+  asleep = true; eng.s.asleep = true;
+  $("night").hidden = false; $("alarmBox").hidden = true;
+  $("nBody").hidden = false;
+  $("night").className = "night";
+  alarmOn = false; snoozeUntil = -1e9;
+  $("btnTempo").textContent = speed === 0 ? "❙❙" : speed + "×";
+  try{ audio = audio || new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  paintNight();
+}
+function endSleep(byAlarm){
+  if (byAlarm) eng.sleepAlarm(eng.lastSensor < 100 ? "low" : "high", eng.lastSensor, false);
+  asleep = false; eng.s.asleep = false; alarmOn = false;
+  $("night").hidden = true;
+  if (navigator.vibrate) navigator.vibrate(0);
+  renderLog();
+}
+function paintNight(){
+  $("nClock").textContent = fmtT(eng.s.t);
+  if (alarmOn) return;
+  const v = eng.lastSensor;
+  if (eng.s.t < snoozeUntil) return;
+  if (v <= ALARM_LOW || v >= ALARM_HIGH){
+    alarmOn = true;
+    const low = v <= ALARM_LOW;
+    $("night").className = "night ring " + (low ? "lo" : "hi");
+    $("nBody").hidden = true; $("alarmBox").hidden = false;
+    $("aValue").textContent = v;
+    $("aText").textContent = low ? "Tiefalarm" : "Hochalarm";
+    beep();
+  }
+}
+$("btnSleep").onclick = guarded(goSleep);
+$("btnWake").onclick = () => endSleep(false);
+$("btnAct").onclick  = () => endSleep(true);
+$("btnSnooze").onclick = () => {
+  eng.sleepAlarm(eng.lastSensor <= ALARM_LOW ? "low" : "high", eng.lastSensor, true);
+  snoozeUntil = eng.s.t + 30;          // dreissig simulierte Minuten Ruhe
+  alarmOn = false;
+  $("night").className = "night";
+  $("alarmBox").hidden = true; $("nBody").hidden = false;
+  if (navigator.vibrate) navigator.vibrate(0);
+};
+$("btnTempo").onclick = () => {
+  if (eng.reality) return;
+  const steps = [1, 20, 60, 300];
+  speed = steps[(steps.indexOf(speed) + 1) % steps.length];
+  $("btnTempo").textContent = speed + "×";
+  [...$("speed").children].forEach(x =>
+    x.setAttribute("aria-pressed", String(+x.dataset.x === speed)));
+  moveKnob($("speed"));
+};
+
 /* ─── Auswertung ──────────────────────────────────────────────── */
 let revStamp = "";
 function updateReview(){
@@ -1995,6 +2163,9 @@ function updateReview(){
   $("rEmg").textContent = eng.events.filter(e => e.kind === "emg" && e.sev !== "ok").length;
   const mard = tr.reduce((a,p) => a + Math.abs(p.sensor - p.G)/p.G, 0)/n;
   $("rMard").textContent = (mard*100).toFixed(1) + " %";
+  const al = eng.events.filter(e => e.kind === "alarm");
+  $("rAlarm").textContent = al.length
+    ? al.length + (al.some(e => e.snoozed) ? " ⚠" : "") : "0";
   $("revTitle").textContent = "Tag " + (Math.floor(eng.s.t/1440)+1);
   const stamp = eng.events.length + ":" + tr.length;
   if (stamp !== revStamp){
@@ -2015,6 +2186,8 @@ function updateReview(){
       return `<li><b>${fmtT(e.t)}</b><span>${e.name}</span></li>`;
     if (e.kind === "basal")
       return `<li><b>${fmtT(e.t)}</b><span>Basal ${e.from.toFixed(2)} → ${e.to.toFixed(2)} U/h</span></li>`;
+    if (e.kind === "alarm")
+      return `<li><b>${fmtT(e.t)}</b><span class="miss">${e.low ? "Tiefalarm" : "Hochalarm"} bei ${e.value}${e.snoozed ? " — weitergeschlafen" : ""}</span></li>`;
     if (e.kind === "warn") return "";
     const p = Math.round((e.effective/e.units-1)*100);
     const cl = Math.abs(p) >= 15 ? ' class="miss"' : '';
@@ -2183,11 +2356,31 @@ requestAnimationFrame(loop);
    deutlich schlechter. Mit 20 Prozent zu hohem Bolus: 6 bis 38 Prozent
    unter 70 und mehrere Notfaelle.
 
+   SCHLAFEN -- nachts sieht man nichts. Der Sensor ist die einzige
+   Verbindung zum eigenen Koerper. Alarmschwellen 70 und 250 mg/dL,
+   Ton und Vibration. Wer weiterschlaeft, zahlt weniger Schlafschuld,
+   riskiert aber mehr. Gleiche Nacht, gleiches Abendessen mit 6 U,
+   Nachmittagstraining plus Alkohol ab 21 Uhr:
+
+     weitergeschlafen ... 6 Alarme, Tiefstwert 39 mg/dL, Schlafschuld 0.42
+     aufgestanden ....... 1 Alarm,  Tiefstwert 69 mg/dL, Schlafschuld 0.13
+
+   Auf den ersten Alarm zu reagieren macht aus einer gefaehrlichen Nacht
+   eine beherrschbare. Die Schlafschuld wirkt erst am Folgetag: bei
+   voller Schuld liegt derselbe Fruehstuecksverlauf nach vier Stunden
+   15 mg/dL hoeher.
+
    REALITY-MODUS -- bei einfacher Geschwindigkeit waehlbar. Der Simulator
    plant dann keine Trainingseinheiten mehr; Mahlzeiten und Einheiten
    traegt der Nutzer ein, wenn sie wirklich stattfinden. Alltagsbewegung,
    Dawn-Phaenomen, Schlaf, Stress und Sensorfehler laufen unveraendert
    weiter -- die plant ohnehin niemand.
+
+   Beim Start wird die Simulationsuhr auf die echte Tageszeit gestellt --
+   nicht durch Springen, sondern durch Vorrechnen, damit Physiologie und
+   Uhrzeit zusammenpassen. Danach haengt die Uhr an der Systemzeit statt
+   an den Einzelbildern. Sonst bliebe der Simulator stehen, sobald der
+   Tab in den Hintergrund geht, und genau dann laesst man ihn ja laufen.
 
    NICHT ENTHALTEN (bewusst, Phase 3): Herzfrequenz aus HealthKit statt
    simulierter Ereignisse, Koffein, Dehydratation, Pumpenmodus,

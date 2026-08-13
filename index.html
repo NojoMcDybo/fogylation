@@ -481,7 +481,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
   <div class="page" id="pHome"><div class="inner">
     <div class="hero">
       <h1>nebel.</h1>
-      <p>Ein Tag mit Typ-1-Diabetes. Der Sensor zeigt dir nicht, wie es deinem Körper geht, sondern wie es ihm vor zwölf Minuten ging.</p>
+      <p>Ein Tag mit Typ-1-Diabetes. Der Sensor zeigt dir nicht, wie es deinem Körper geht, sondern wie es ihm vor fünf Minuten ging.</p>
     </div>
 
     <div class="eyebrow">Fünf Regeln</div>
@@ -489,7 +489,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
       <div class="fact" tabindex="0" role="button" aria-expanded="false">
         <div>
           <h3>Die Zahl ist eine Schätzung</h3>
-          <div class="body"><div><p>Gemessen wird im Gewebe, nicht im Blut. Der Wert hinkt rund zwölf Minuten hinterher, und er rauscht — am stärksten im Tiefen und bei schnellen Veränderungen. Also genau dann, wenn du ihn brauchst.</p></div></div>
+          <div class="body"><div><p>Gemessen wird im Gewebe, nicht im Blut. Der Wert hinkt rund fünf Minuten hinterher, und er rauscht — am stärksten im Tiefen und bei schnellen Veränderungen. Also genau dann, wenn du ihn brauchst.</p></div></div>
         </div>
         <div class="mark"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v13M1 7.5h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
       </div>
@@ -584,7 +584,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
         </span>
       </div>
       <div class="unit">mg/dL · Sensor</div>
-      <div class="behind" id="behind">dein Körper vor etwa zwölf Minuten</div>
+      <div class="behind" id="behind">dein Körper vor etwa fünf Minuten</div>
     </div>
 
     <div class="chartcard"><canvas id="chart"></canvas></div>
@@ -848,7 +848,7 @@ const P = {
   Vg:144.0, Vi:10.8, ke:0.138, tau_i:44.0, p2:0.055, SI:6.159025e-4,
   p1:0.0006, Gb:110.0, EGPb:1.30, kL:180.0, kR:0.005,
   kCR:0.008, Gcr:112.0, CRmax:0.50, Ksat:100.0, Ag:0.85,
-  tau_sens:12.0,
+  tau_sens:5.0,
   basalRef:0.9/60,   // die korrekt titrierte Rate -- Bezugspunkt der Bilanz
   tauBasal:180.0,    // Langzeitinsulin stellt sich langsam um
   dawnA:0.26,       // Amplitude des Dawn-Phaenomens
@@ -1609,7 +1609,7 @@ function drawChart(cv, pts, hours, tNow, opts={}){
 
   /* ═══ SIGNATUR — die Nebelzone ══════════════════════════════════
      Der letzte Messpunkt sitzt dort, wo er physiologisch hingehoert:
-     zwoelf Minuten in der Vergangenheit. Der Schleier rechts davon ist
+     fuenf Minuten in der Vergangenheit. Der Schleier rechts davon ist
      die Gegenwart deines Koerpers, ueber die keine Information
      existiert. Kein reales CGM zeigt das. Genau deshalb steht es hier. */
   if (!opts.review){
@@ -1699,7 +1699,7 @@ function paint(tNow){
 
   uiFade = lerp(uiFade, clamp((72-v)/26, 0, 1), .045);
   document.documentElement.style.setProperty("--fade", uiFade.toFixed(3));
-  $("behind").textContent = uiFade > .4 ? "schwer zu lesen" : "dein Körper vor etwa zwölf Minuten";
+  $("behind").textContent = uiFade > .4 ? "schwer zu lesen" : "dein Körper vor etwa fünf Minuten";
 
   // Zustandsanzeigen brauchen keine 60 Bilder pro Sekunde.
   if ((frame++ & 7) === 0){ paintMove(); paintReserve(); paintChips(); paintCrit(); paintBasal(); }
@@ -2148,7 +2148,7 @@ requestAnimationFrame(loop);
    MESSUNG
    ----------------------------------------------------------------------
    Im Tiefen gleicht sich das Gewebe langsamer an, die Verzoegerung
-   waechst von 12 auf bis zu 19 Minuten. Der Sensorfehler steigt
+   waechst von 5 auf bis zu 8 Minuten. Der Sensorfehler steigt
    zusaetzlich im Hypobereich, bei schneller Aenderung sowie am ersten
    und ab dem achten Tragetag.
 

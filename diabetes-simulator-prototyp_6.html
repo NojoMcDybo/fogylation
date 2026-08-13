@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>nebel. — Diabetes-Alltagssimulator</title>
+<script>document.documentElement.dataset.theme = "light";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   FARBKONZEPT
+   Alles ist unbunt: Papier, Karte, Tinte. Chroma ist ausschliesslich
+   den beiden Schwellen vorbehalten, unten und oben. Im Zielbereich
+   hat der Bildschirm keine Farbe. Ein guter Tag sieht langweilig aus.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --paper:#EDF1F1; --card:#FFFFFF; --sink:#E3E9E9;
+  --ink:#0A0D0D; --ink2:#576262; --ink3:#5F6A6A;
+  --hair:rgba(10,13,13,.11);
+  --low:#B8362B; --high:#8E6410;
+  --rgb-ink:10,13,13; --rgb-card:255,255,255; --rgb-paper:237,241,241;
+  --sh:0 1px 2px rgba(10,13,13,.05); --shUp:0 6px 22px rgba(10,13,13,.10);
+  --shBtn:0 3px 12px rgba(10,13,13,.16); --shPage:-22px 0 54px rgba(10,13,13,.16);
+  --ring:rgba(184,54,43,.26); --scrim:rgba(10,13,13,.34);
+  --sans:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"DM Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --spring:cubic-bezier(.22,.9,.24,1);
+  --fade:0;
+}
+html[data-theme="dark"]{
+  --paper:#0E1213; --card:#191E20; --sink:#262D2F;
+  --ink:#E9EFEF; --ink2:#A3AEAE; --ink3:#7E8A8A;
+  --hair:rgba(233,239,239,.14);
+  --low:#FF7063; --high:#E8B44A;
+  --rgb-ink:233,239,239; --rgb-card:25,30,32; --rgb-paper:14,18,19;
+  --sh:0 0 0 1px rgba(233,239,239,.07); --shUp:0 0 0 1px rgba(233,239,239,.14), 0 10px 30px rgba(0,0,0,.5);
+  --shBtn:0 4px 16px rgba(0,0,0,.5); --shPage:-22px 0 54px rgba(0,0,0,.6);
+  --ring:rgba(255,112,99,.34); --scrim:rgba(0,0,0,.52);
+}
+html{color-scheme:light}
+html[data-theme="dark"]{color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  transition:background-color .5s var(--spring), color .5s var(--spring);
+  font-family:var(--sans); font-size:15px; line-height:1.45; color:var(--ink);
+  background:var(--paper); -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none;
+}
+
+/* ─── Pager: zwei nebeneinanderliegende Seiten ─────────────────── */
+#pager{position:fixed; inset:0; overflow:hidden; touch-action:pan-y}
+body.dragging, body.dragging *{
+  user-select:none!important; -webkit-user-select:none!important;
+  cursor:grabbing!important;
+}
+.page{
+  position:absolute; inset:0; overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch; will-change:transform;
+  display:flex; justify-content:center;
+}
+.page{--off:0px; padding-right:calc(var(--off)*2)}
+.page > .inner{width:100%; max-width:460px; padding:0 20px}
+.page.snap{transition:transform .56s var(--spring), opacity .56s var(--spring), filter .56s var(--spring)}
+.page.snap, body.dragging .page{will-change:transform, filter}
+#pSim{box-shadow:var(--shPage); border-radius:26px 0 0 26px; z-index:2; --off:26px}
+#pRev{box-shadow:var(--shPage); border-radius:26px 0 0 26px; z-index:4; --off:26px}
+#fogSim{z-index:3} #fogRev{z-index:5}
+#pHome{z-index:1}
+.fog{
+  position:absolute; inset:0; pointer-events:none; will-change:opacity;
+  background:linear-gradient(100deg,rgba(var(--rgb-paper),.97) 0%,rgba(var(--rgb-paper),.70) 46%,rgba(var(--rgb-paper),.30) 100%);
+}
+.fog.snap{transition:opacity .56s var(--spring)}
+
+/* ─── Seitenindikator ──────────────────────────────────────────── */
+#rail{
+  position:fixed; left:0; right:0; bottom:0; z-index:25;
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  padding:12px 0 calc(12px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,var(--paper) 46%,rgba(var(--rgb-paper),0));
+  pointer-events:none;
+}
+#rail button{
+  pointer-events:auto; border:0; background:transparent; padding:8px 5px; cursor:pointer;
+  display:flex; align-items:center;
+}
+#rail i{
+  display:block; height:5px; width:5px; border-radius:99px; background:var(--ink3);
+  transition:width .45s var(--spring), background .45s var(--spring);
+}
+#rail button[aria-current="true"] i{width:22px; background:var(--ink)}
+#topbar{
+  position:fixed; top:0; left:0; right:0; z-index:60; display:flex; justify-content:center;
+  pointer-events:none;
+}
+#topbar .col{
+  width:100%; max-width:460px; padding:calc(14px + env(safe-area-inset-top)) 20px 0;
+  display:flex; justify-content:flex-end;
+}
+.tgl{
+  pointer-events:auto; position:relative; width:70px; height:36px; padding:0; border:0;
+  border-radius:99px; cursor:pointer; background:var(--card);
+  box-shadow:inset 0 0 0 1.5px var(--hair), 0 4px 16px rgba(0,0,0,.13);
+  display:grid; grid-template-columns:1fr 1fr; align-items:center;
+  transition:background-color .5s var(--spring), transform .28s var(--spring);
+}
+.tgl:active{transform:scale(.93)}
+.tgl .knob{
+  position:absolute; top:3px; left:3px; width:30px; height:30px; border-radius:99px;
+  background:var(--ink); box-shadow:0 2px 6px rgba(0,0,0,.28);
+  transition:transform .48s var(--spring), background-color .5s var(--spring);
+}
+html[data-theme="dark"] .tgl .knob{transform:translateX(34px)}
+.tgl .i{
+  position:relative; z-index:1; width:18px; height:18px; margin:0 auto;
+  transition:color .45s var(--spring);
+}
+.tgl .sun{color:var(--paper)}
+.tgl .moon{color:var(--ink3)}
+html[data-theme="dark"] .tgl .sun{color:var(--ink3)}
+html[data-theme="dark"] .tgl .moon{color:var(--paper)}
+
+/* ═══ HOME ═══════════════════════════════════════════════════════ */
+.hero{padding:64px 0 6px}
+.hero h1{
+  font-size:60px; font-weight:800; letter-spacing:-.045em; line-height:.92; margin:0 0 12px;
+}
+.hero p{font-size:16px; color:var(--ink2); margin:0; max-width:30ch; line-height:1.5}
+.eyebrow{
+  font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--ink3); margin:38px 0 12px;
+}
+.stack{display:grid; gap:9px}
+.fact{
+  background:var(--card); border-radius:18px; padding:17px 18px; cursor:pointer;
+  display:grid; grid-template-columns:1fr 26px; align-items:start; gap:12px;
+  transition:transform .3s var(--spring), box-shadow .3s var(--spring), background .3s var(--spring);
+  box-shadow:var(--sh);
+}
+.fact:active{transform:scale(.983)}
+.fact[aria-expanded="true"]{box-shadow:var(--shUp)}
+.fact h3{font-size:15.5px; font-weight:700; margin:0; letter-spacing:-.01em}
+.fact .body{
+  display:grid; grid-template-rows:0fr; transition:grid-template-rows .42s var(--spring);
+}
+.fact[aria-expanded="true"] .body{grid-template-rows:1fr}
+.fact .body > div{overflow:hidden}
+.fact .body p{margin:9px 0 0; font-size:14px; color:var(--ink2); line-height:1.55}
+.fact .mark{
+  width:26px; height:26px; display:grid; place-items:center; color:var(--ink);
+  transition:transform .42s var(--spring);
+}
+.fact[aria-expanded="true"] .mark{transform:rotate(45deg)}
+.grid4{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+.tile{transition:background-color .5s var(--spring); background:var(--card); border-radius:18px; padding:15px 17px; box-shadow:var(--sh)}
+.tile .k{font-family:var(--mono); font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink3)}
+.tile .v{font-size:21px; font-weight:700; margin-top:4px; letter-spacing:-.02em}
+.warnbox{
+  background:var(--card); border-radius:18px; padding:16px 18px; margin-top:9px;
+  font-size:13px; color:var(--ink2); line-height:1.55;
+  box-shadow:inset 0 0 0 1.5px var(--ring);
+}
+.warnbox b{color:var(--low)}
+
+/* Wisch-Aufforderung */
+.swipe{
+  margin:30px 0 108px; background:var(--ink); color:var(--paper); border-radius:20px;
+  padding:19px 20px; display:flex; align-items:center; gap:14px; cursor:pointer;
+  transition:transform .3s var(--spring), box-shadow .3s var(--spring);
+  box-shadow:var(--shBtn);
+}
+.swipe:active{transform:scale(.982)}
+.swipe .t{flex:1}
+.swipe .t .a{font-size:15.5px; font-weight:700; letter-spacing:-.01em}
+.swipe .t .b{font-family:var(--mono); font-size:11px; color:rgba(237,241,241,.62); margin-top:3px}
+.swipe .arrows{display:flex; gap:2px; color:var(--paper)}
+.swipe .arrows span{animation:drift 1.9s ease-in-out infinite; opacity:.3}
+.swipe .arrows span:nth-child(2){animation-delay:.14s; opacity:.6}
+.swipe .arrows span:nth-child(3){animation-delay:.28s; opacity:1}
+@keyframes drift{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+.live{
+  font-family:var(--mono); font-size:11px; color:rgba(237,241,241,.62);
+  margin-top:3px; font-variant-numeric:tabular-nums;
+}
+
+/* ═══ SIMULATOR ══════════════════════════════════════════════════ */
+.simtop{position:relative; display:flex; align-items:center; padding:18px 0 6px; min-height:44px}
+.stamp{
+  position:absolute; left:50%; transform:translateX(-50%);
+  display:flex; align-items:baseline; gap:9px; white-space:nowrap;
+}
+.simtop .wm{font-size:19px; font-weight:800; letter-spacing:-.035em}
+.simtop .grow{flex:1}
+.simtop .clock{font-family:var(--mono); font-size:14px; font-variant-numeric:tabular-nums}
+.simtop .day{font-family:var(--mono); font-size:11px; color:var(--ink3)}
+
+/* Segment mit gleitendem Indikator — das eigentliche visuelle Feedback */
+.seg{position:relative; display:flex; background:var(--sink); border-radius:99px; padding:3px}
+.seg .knob{
+  position:absolute; top:3px; bottom:3px; left:3px; border-radius:99px; background:var(--ink);
+  transition:transform .42s var(--spring), width .42s var(--spring); z-index:0;
+}
+.seg button{
+  position:relative; z-index:1; flex:1; border:0; background:transparent; cursor:pointer;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink2); height:30px; padding:0 11px;
+  transition:color .3s var(--spring); white-space:nowrap;
+}
+.seg button[aria-pressed="true"]{color:var(--paper)}
+.seg.tall button{height:40px; font-family:var(--sans); font-size:13.5px; font-weight:600}
+
+.readout{padding:26px 0 10px; text-align:center; filter:blur(calc(var(--fade)*3.4px)); transition:filter 1.1s linear}
+.valrow{display:flex; align-items:center; justify-content:center; gap:12px}
+.value{
+  font-size:88px; font-weight:800; letter-spacing:-.06em; line-height:.85;
+  font-variant-numeric:tabular-nums; transition:color 1.2s linear;
+}
+.value.pulse{animation:tick .6s var(--spring)}
+@keyframes tick{0%{transform:scale(1);opacity:.5}36%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
+.arrowbox{width:32px;height:32px;position:relative}
+.arrowbox svg{position:absolute;inset:0;width:32px;height:32px;transition:transform .9s var(--spring),color 1.2s linear}
+.unit{font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink3); margin-top:13px}
+.behind{font-size:12.5px; color:var(--ink3); margin-top:5px}
+
+.chartcard{transition:background-color .5s var(--spring); background:var(--card); border-radius:22px; padding:12px 8px 4px; box-shadow:var(--sh)}
+canvas{width:100%; height:206px; display:block; touch-action:pan-y}
+.rangerow{display:flex; justify-content:center; margin:11px 0 14px}
+.rangerow .seg{width:auto}
+
+.strip{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+.stat{transition:background-color .5s var(--spring); background:var(--card); border-radius:16px; padding:12px 13px; box-shadow:var(--sh)}
+.stat .k{font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3)}
+.stat .v{font-size:18px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+
+.actions{display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:14px}
+
+/* ─── Notfall über der Zahl ─── */
+.crit{
+  display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:12px;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+  animation:land .5s var(--spring);
+}
+.crit[hidden]{display:none}
+.crit svg{width:27px; height:27px}
+.crit.lo{color:var(--low)}
+.crit.hi{color:var(--high)}
+.crit.lo #critAmb, .crit.hi #critSkull{display:none}
+.crit svg{animation:beat 1.7s ease-in-out infinite}
+
+/* ─── Zustandschips ─── */
+.chips{
+  list-style:none; margin:0; padding:0;
+  gap:6px; overflow-x:auto; padding:11px 0 3px;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto; display:flex; align-items:center; gap:7px; white-space:nowrap;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.04em;
+  padding:6px 11px; border-radius:99px; background:var(--sink); color:var(--ink2);
+  animation:pop .42s var(--spring);
+  transition:background-color .4s var(--spring), color .4s var(--spring);
+}
+.chip i{width:5px; height:5px; border-radius:99px; background:currentColor}
+.chip.kombi{background:var(--ink); color:var(--paper)}
+.chip.nacht{background:transparent; box-shadow:inset 0 0 0 1.3px var(--hair); color:var(--ink3)}
+
+/* ─── Reserven ─── */
+.reserve{
+  display:flex; align-items:center; gap:13px; margin-top:8px;
+  background:var(--card); border-radius:16px; padding:13px 15px; box-shadow:var(--sh);
+  transition:background-color .5s var(--spring), box-shadow .45s var(--spring);
+}
+.reserve .rk{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink3); white-space:nowrap; transition:color .5s var(--spring);
+}
+.rbar{flex:1; height:5px; border-radius:99px; background:var(--sink); overflow:hidden}
+.rbar b{
+  display:block; height:100%; border-radius:99px; background:var(--ink);
+  transition:width .8s linear, background-color .6s var(--spring);
+}
+.reserve .rv{
+  font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums;
+  min-width:40px; text-align:right; transition:color .5s var(--spring);
+}
+.reserve.low{box-shadow:inset 0 0 0 1.8px var(--low), var(--sh)}
+.reserve.low .rbar b, .reserve.low .rv{background:var(--low); color:var(--low)}
+.reserve.low .rk{color:var(--low)}
+
+/* ─── Bewegungskarte ─── */
+.move{
+  background:var(--card); border-radius:18px; padding:15px 17px; margin-top:9px;
+  box-shadow:var(--sh);
+  transition:box-shadow .45s var(--spring), background-color .5s var(--spring);
+}
+.move.live{box-shadow:inset 0 0 0 1.8px var(--ink), var(--sh)}
+.move.soon{box-shadow:inset 0 0 0 1.8px var(--high), var(--sh)}
+.move.fresh{animation:land .55s var(--spring)}
+@keyframes land{0%{transform:scale(.94);opacity:0}60%{transform:scale(1.015)}100%{transform:none;opacity:1}}
+.move .top{display:flex; align-items:center; gap:9px}
+.move .nm{font-size:15px; font-weight:700; letter-spacing:-.01em}
+.move .wh{
+  margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--ink2);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.move .sub{font-size:12.5px; color:var(--ink3); margin-top:5px}
+.beat{width:8px; height:8px; border-radius:99px; background:var(--ink); flex:0 0 auto}
+.move.live .beat{animation:beat 1.5s ease-in-out infinite}
+.move.soon .beat{background:var(--high)}
+@keyframes beat{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.35}}
+.load{display:flex; gap:3px; align-items:center}
+.load i{width:4px; height:12px; border-radius:2px; background:var(--ink3); opacity:.28}
+.load i.on{opacity:1; background:var(--ink)}
+.move.soon .load i.on{background:var(--high)}
+.bar{height:4px; border-radius:99px; background:var(--sink); margin-top:12px; overflow:hidden}
+.bar b{display:block; height:100%; border-radius:99px; background:var(--ink); transition:width .5s linear}
+.move.soon .bar b{background:var(--high)}
+
+/* ─── Schnellwahl im Essen-Menü ─── */
+.quick{
+  width:100%; display:flex; align-items:center; gap:12px; text-align:left;
+  background:var(--sink); border:0; border-radius:16px; padding:14px 16px;
+  margin:0 0 20px; cursor:pointer; color:var(--ink);
+  transition:transform .22s var(--spring), background-color .3s var(--spring);
+}
+.quick:active{transform:scale(.97)}
+.quick .a{font-size:15px; font-weight:700; letter-spacing:-.01em}
+.quick .b{font-size:12.5px; color:var(--ink2); margin-top:2px}
+.quick .g{margin-left:auto; font-family:var(--mono); font-size:13px; color:var(--ink2)}
+.divider{
+  display:flex; align-items:center; gap:12px; margin:0 0 18px;
+  font-family:var(--mono); font-size:10px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--ink3);
+}
+.divider::before,.divider::after{content:""; flex:1; height:1px; background:var(--hair)}
+.tiphint{
+  font-family:var(--mono); font-size:11px; color:var(--ink3); text-align:center;
+  margin:18px 0 0; letter-spacing:.04em;
+}
+.btn{
+  font-family:var(--sans); font-size:15px; font-weight:700; min-height:54px; border:0;
+  border-radius:16px; cursor:pointer; background:var(--ink); color:var(--paper);
+  letter-spacing:-.01em;
+  transition:transform .22s var(--spring), box-shadow .22s var(--spring), opacity .2s;
+  box-shadow:var(--shBtn);
+}
+.btn:active{transform:scale(.965); box-shadow:var(--sh)}
+.btn.wide{grid-column:1/-1}
+.btn.soft{background:var(--card); color:var(--ink); box-shadow:var(--sh)}
+.btn.line{background:transparent; color:var(--ink2); box-shadow:inset 0 0 0 1.5px var(--hair); min-height:46px; font-size:13.5px; font-weight:600}
+
+.log{margin:22px 0 112px}
+.log h4{font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink3); font-weight:400; margin:0 0 10px}
+.log ul{list-style:none; margin:0; padding:0}
+.log li{
+  display:flex; gap:13px; padding:11px 15px; margin-bottom:6px; border-radius:13px;
+  background:var(--card); font-family:var(--mono); font-size:12px; color:var(--ink2);
+  animation:pop .42s var(--spring); box-shadow:var(--sh);
+}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.985)}to{opacity:1;transform:none}}
+.log li b{color:var(--ink); font-weight:500; min-width:44px; font-variant-numeric:tabular-nums}
+
+/* ─── Sheets ───────────────────────────────────────────────────── */
+.sheet{
+  position:fixed; inset:0; z-index:40; display:flex; align-items:flex-end; justify-content:center;
+  background:transparent; backdrop-filter:blur(0px); -webkit-backdrop-filter:blur(0px);
+  opacity:0; pointer-events:none;
+  transition:opacity .34s var(--spring), background .34s var(--spring), backdrop-filter .34s var(--spring);
+}
+.sheet.on{opacity:1; pointer-events:auto; background:var(--scrim); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px)}
+.panel{
+  width:100%; max-width:460px; background:var(--paper); border-radius:26px 26px 0 0;
+  padding:12px 20px calc(22px + env(safe-area-inset-bottom));
+  transform:translateY(103%); transition:transform .44s var(--spring);
+  max-height:92dvh; overflow-y:auto;
+}
+.sheet.on .panel{transform:none}
+.grab{width:38px; height:4px; border-radius:99px; background:var(--ink3); opacity:.5; margin:0 auto 16px}
+.panel h3{font-size:22px; font-weight:800; letter-spacing:-.03em; margin:0 0 20px}
+.field{margin-bottom:20px}
+.field label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px}
+.field label span{font-family:var(--mono); font-size:11px; letter-spacing:.05em; color:var(--ink3); text-transform:uppercase}
+.field label b{font-size:26px; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:38px; background:transparent; display:block;
+}
+input[type=range]::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:var(--sink)}
+input[type=range]::-moz-range-track{height:8px; border-radius:99px; background:var(--sink)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:30px; height:30px; border-radius:99px; background:var(--ink);
+  margin-top:-11px; box-shadow:0 3px 10px rgba(0,0,0,.28);
+  transition:transform .2s var(--spring);
+}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.16)}
+input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radius:99px;background:var(--ink)}
+.hint{font-size:13px; color:var(--ink2); line-height:1.5; margin:-8px 0 20px}
+.hint.warn{color:var(--high); font-weight:600}
+.row2{display:grid; grid-template-columns:1fr 1.5fr; gap:9px}
+
+/* ─── Auswertung ───────────────────────────────────────────────── */
+.screen{position:fixed; inset:0; z-index:50; overflow-y:auto; background:var(--paper); display:flex; justify-content:center}
+.screen.hidden{display:none}
+.screen .inner{width:100%; max-width:460px; padding:64px 20px calc(28px + env(safe-area-inset-bottom))}
+.screen h1{font-size:44px; font-weight:800; letter-spacing:-.045em; margin:0 0 10px; line-height:.95}
+.screen h2{font-size:18px; font-weight:700; letter-spacing:-.02em; margin:32px 0 12px}
+.screen p.lede{font-size:15.5px; color:var(--ink2); margin:0 0 22px; line-height:1.5}
+.legend{display:flex; gap:18px; flex-wrap:wrap; font-family:var(--mono); font-size:11px; color:var(--ink2); margin:12px 0 10px}
+.legend i{display:inline-block; width:16px; height:2.5px; vertical-align:middle; margin-right:7px; border-radius:2px}
+.decisions{list-style:none; margin:0; padding:0}
+.decisions li{
+  display:flex; gap:13px; padding:12px 15px; margin-bottom:6px; border-radius:13px;
+  background:var(--card); font-family:var(--mono); font-size:12px; color:var(--ink2);
+}
+.decisions li b{color:var(--ink); font-weight:500; min-width:44px}
+.decisions .miss{color:var(--high); font-weight:500}
+
+@media (hover:hover){
+  .fact:hover{box-shadow:var(--shUp)}
+  .btn:hover{opacity:.9}
+  .swipe:hover{transform:translateX(-3px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation:none!important}}
+:focus-visible{outline:2.5px solid var(--ink); outline-offset:3px}
+@media (max-width:350px){.hero h1{font-size:48px} .value{font-size:72px}}
+</style>
+</head>
+<body>
+
+<div id="pager">
+  <!-- ══════════ SEITE 1 — HOME ══════════ -->
+  <div class="page" id="pHome"><div class="inner">
+    <div class="hero">
+      <h1>nebel.</h1>
+      <p>Ein Tag mit Typ-1-Diabetes. Der Sensor zeigt dir nicht, wie es deinem Körper geht, sondern wie es ihm vor zwölf Minuten ging.</p>
+    </div>
+
+    <div class="eyebrow">Fünf Regeln</div>
+    <div class="stack" id="facts">
+      <div class="fact" tabindex="0" role="button" aria-expanded="false">
+        <div>
+          <h3>Die Zahl ist eine Schätzung</h3>
+          <div class="body"><div><p>Gemessen wird im Gewebe, nicht im Blut. Der Wert hinkt rund zwölf Minuten hinterher, und er rauscht — am stärksten im Tiefen und bei schnellen Veränderungen. Also genau dann, wenn du ihn brauchst.</p></div></div>
+        </div>
+        <div class="mark"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v13M1 7.5h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="fact" tabindex="0" role="button" aria-expanded="false">
+        <div>
+          <h3>Deine Kohlenhydrate auch</h3>
+          <div class="body"><div><p>Du siehst einen Teller, keine Nährwerttabelle. Was du einträgst, ist was du glaubst. Der Körper rechnet mit dem, was wirklich drauf lag. Die Differenz siehst du erst in der Auswertung.</p></div></div>
+        </div>
+        <div class="mark"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v13M1 7.5h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="fact" tabindex="0" role="button" aria-expanded="false">
+        <div>
+          <h3>Insulin wirkt später</h3>
+          <div class="body"><div><p>Beginn nach zehn bis zwanzig Minuten, Maximum nach eineinhalb Stunden, Ende nach vier bis fünf. Kohlenhydrate sind schneller. Aus dieser Lücke folgt fast alles — und der häufigste Fehler ist, nachzulegen, weil scheinbar nichts passiert.</p></div></div>
+        </div>
+        <div class="mark"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v13M1 7.5h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="fact" tabindex="0" role="button" aria-expanded="false">
+        <div>
+          <h3>Nichts wirkt für sich allein</h3>
+          <div class="body"><div><p>Schlaf, Stress, Krankheit, Alkohol, die Reserven in deiner Leber und wie lange dein Sensor schon klebt — all das verschiebt, wie Insulin und Kohlenhydrate wirken. Manche Kombinationen erzeugen etwas, das keiner der Faktoren allein erzeugt hätte. Training am Nachmittag ist harmlos. Alkohol am Abend ist harmlos. Beides an einem Tag kann dich nachts umwerfen.</p></div></div>
+        </div>
+        <div class="mark"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v13M1 7.5h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="fact" tabindex="0" role="button" aria-expanded="false">
+        <div>
+          <h3>Es läuft weiter</h3>
+          <div class="body"><div><p>Der Körper rechnet auch, wenn du auf dieser Seite bist. Nachts, bei anderen Aufgaben, immer. Es gibt keinen Pausenknopf, nur Tempo.</p></div></div>
+        </div>
+        <div class="mark"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1v13M1 7.5h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+      </div>
+    </div>
+
+    <div class="eyebrow">Deine Therapiewerte</div>
+    <div class="grid4">
+      <div class="tile"><div class="k">KE-Faktor</div><div class="v">10 g/U</div></div>
+      <div class="tile"><div class="k">Korrektur</div><div class="v">35 mg/dL</div></div>
+      <div class="tile"><div class="k">Zielbereich</div><div class="v">70–180</div></div>
+      <div class="tile"><div class="k">Basal</div><div class="v">0.9 U/h</div></div>
+    </div>
+    <div class="warnbox"><b>Lernwerkzeug, kein Medizinprodukt.</b> Die Werte sind simuliert und taugen nicht für reale Therapieentscheidungen. Kein Bolusrechner.</div>
+
+    <div class="swipe" id="swipeCta">
+      <div class="t">
+        <div class="a">Zum Simulator</div>
+        <div class="b" id="ctaSub">nach links wischen oder ziehen</div>
+      </div>
+      <div class="arrows">
+        <span><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7 7.5l-5.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7 7.5l-5.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7 7.5l-5.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- ══════════ SEITE 2 — SIMULATOR ══════════ -->
+  <div class="page" id="pSim"><div class="inner">
+    <div class="simtop">
+      <span class="wm">nebel.</span>
+      <div class="stamp">
+        <span class="clock" id="clock">07:00</span>
+        <span class="day" id="dayLabel">Tag 1</span>
+      </div>
+    </div>
+
+    <div class="readout" id="readout">
+      <div class="crit" id="crit" hidden>
+        <svg id="critSkull" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C7.6 2 4 5.5 4 9.7c0 2.6 1.3 4.6 3 5.8V19a1 1 0 001 1h1.6v-2h1.1v2h2.6v-2h1.1v2H17a1 1 0 001-1v-3.5c1.7-1.2 3-3.2 3-5.8C21 5.5 16.4 2 12 2z"
+                stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          <circle cx="9" cy="10.2" r="1.9" fill="currentColor"/>
+          <circle cx="15" cy="10.2" r="1.9" fill="currentColor"/>
+        </svg>
+        <svg id="critAmb" viewBox="0 0 24 24" fill="none">
+          <path d="M2 7.5h11.2v8.8H2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          <path d="M13.2 10.4h3.9l3.1 3.3v2.6h-7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          <circle cx="6.6" cy="18.4" r="1.9" stroke="currentColor" stroke-width="1.7"/>
+          <circle cx="16.6" cy="18.4" r="1.9" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M6.2 11.9h3.4M7.9 10.2v3.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <span id="critTxt"></span>
+      </div>
+      <div class="valrow">
+        <span class="value" id="bg">110</span>
+        <span class="arrowbox">
+          <svg id="arrow" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 26V7M16 7l-6.5 6.5M16 7l6.5 6.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
+      <div class="unit">mg/dL · Sensor</div>
+      <div class="behind" id="behind">dein Körper vor etwa zwölf Minuten</div>
+    </div>
+
+    <div class="chartcard"><canvas id="chart"></canvas></div>
+    <div class="rangerow">
+      <div class="seg" id="ranges">
+        <span class="knob"></span>
+        <button data-h="3" aria-pressed="true">3 Std</button>
+        <button data-h="6">6</button>
+        <button data-h="12">12</button>
+        <button data-h="24">24</button>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div class="stat"><div class="k">Insulin aktiv</div><div class="v" id="iob">0.0 U</div></div>
+      <div class="stat"><div class="k">KH aktiv</div><div class="v" id="cob">0 g</div></div>
+      <div class="stat"><div class="k">im Ziel</div><div class="v" id="tir">—</div></div>
+    </div>
+
+    <div class="reserve" id="reserve">
+      <span class="rk" id="resLabel">Reserven</span>
+      <span class="rbar"><b id="resBar" style="width:100%"></b></span>
+      <span class="rv" id="resVal">100 %</span>
+    </div>
+
+    <ul class="chips" id="chips"></ul>
+
+    <div class="actions">
+      <button class="btn" id="btnMeal">Essen</button>
+      <button class="btn" id="btnBolus">Insulin</button>
+    </div>
+
+    <div class="move" id="moveCard">
+      <div class="top">
+        <span class="beat" id="mvBeat" style="display:none"></span>
+        <span class="nm" id="mvName">Nichts geplant</span>
+        <span class="wh" id="mvWhen"></span>
+      </div>
+      <div class="sub" id="mvSub">Bewegung kommt, wie sie kommt.</div>
+      <div class="bar" id="mvBarWrap" style="display:none"><b id="mvBar" style="width:0%"></b></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <div class="eyebrow" style="margin:0 0 9px">Tempo</div>
+      <div class="seg" id="speed">
+        <span class="knob"></span>
+        <button data-x="0">Pause</button>
+        <button data-x="1">1×</button>
+        <button data-x="60" aria-pressed="true">60×</button>
+        <button data-x="300">300×</button>
+      </div>
+    </div>
+
+    <div class="log">
+      <h4>Protokoll</h4>
+      <ul id="logList"></ul>
+      <p class="tiphint">weiter wischen → Auswertung</p>
+    </div>
+  </div></div>
+
+  <div class="page" id="pRev"><div class="inner">
+  <div class="eyebrow" style="margin-top:0">Auswertung</div>
+  <h1 id="revTitle">Tag 1</h1>
+  <p class="lede">Jetzt siehst du, was der Sensor dir vorenthalten hat.</p>
+  <div class="grid4">
+    <div class="tile"><div class="k">im Ziel 70–180</div><div class="v" id="rTir">—</div></div>
+    <div class="tile"><div class="k">wirklich unter 70</div><div class="v" id="rLow">—</div></div>
+    <div class="tile"><div class="k">Mittelwert</div><div class="v" id="rAvg">—</div></div>
+    <div class="tile"><div class="k">Entscheidungen</div><div class="v" id="rDec">—</div></div>
+    <div class="tile"><div class="k">Notfälle</div><div class="v" id="rEmg">—</div></div>
+    <div class="tile"><div class="k">Sensorabweichung</div><div class="v" id="rMard">—</div></div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--ink)"></i>Sensor — was du gesehen hast</span>
+    <span><i style="background:var(--low)"></i>Blut — was wirklich war</span>
+  </div>
+  <div class="chartcard"><canvas id="revChart"></canvas></div>
+  <h2>Was du eingetragen hast</h2>
+  <ul class="decisions" id="revList"></ul>
+  <p style="font-size:13px;color:var(--ink3);margin-top:20px;line-height:1.6">Ein simulierter Tag ist kein Leben mit Diabetes. Es fehlen die Jahre Übung, die Routinen, die Abkürzungen — und alles, was außerhalb des Körpers passiert. Wer danach glaubt, er wisse jetzt wie es ist, hat das Gegenteil gelernt.</p>
+  <p class="tiphint" style="margin:26px 0 110px">← zurück wischen</p>
+</div></div>
+
+  <div class="fog" id="fogSim"></div>
+  <div class="fog" id="fogRev"></div>
+</div>
+
+<div id="topbar"><div class="col">
+  <button id="theme" class="tgl" role="switch" aria-label="Dunkelmodus" aria-pressed="false">
+    <span class="knob"></span>
+    <svg class="i sun" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.7" stroke="currentColor" stroke-width="1.8"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 1.4v1.9M10 16.7v1.9M18.6 10h-1.9M3.3 10H1.4M16.1 3.9l-1.4 1.4M5.3 14.7l-1.4 1.4M16.1 16.1l-1.4-1.4M5.3 5.3L3.9 3.9"/></g></svg>
+    <svg class="i moon" viewBox="0 0 20 20" fill="none"><path d="M16.8 12.4A7.3 7.3 0 017.6 3.2a7.3 7.3 0 109.2 9.2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+  </button>
+</div></div>
+
+<div id="rail">
+  <button data-p="0" aria-current="true" aria-label="Start"><i></i></button>
+  <button data-p="1" aria-label="Simulator"><i></i></button>
+  <button data-p="2" aria-label="Auswertung"><i></i></button>
+</div>
+
+<!-- ══════════ SHEET: ESSEN ══════════ -->
+<div class="sheet" id="sheetMeal"><div class="panel">
+  <div class="grab"></div>
+  <h3>Essen eintragen</h3>
+  <button class="quick" id="btnRescue">
+    <span>
+      <span class="a">Traubenzucker</span>
+      <span class="b">Sofort wirksam, keine Schätzung nötig</span>
+    </span>
+    <span class="g">15 g</span>
+  </button>
+  <div class="divider">oder eintragen</div>
+  <div class="field">
+    <label><span>Kohlenhydrate, geschätzt</span><b><span id="mG">50</span> g</b></label>
+    <input type="range" id="mealG" min="5" max="150" step="5" value="50">
+  </div>
+  <p class="hint">Trag ein, was du glaubst. Nachmessen kannst du nicht.</p>
+  <div class="field">
+    <label><span>Art</span></label>
+    <div class="seg tall" id="mealType">
+      <span class="knob"></span>
+      <button data-t="fast" aria-pressed="true">Schnell</button>
+      <button data-t="mixed">Gemischt</button>
+      <button data-t="fatty">Fettig</button>
+    </div>
+  </div>
+  <div class="field">
+    <label><span>Dauer der Mahlzeit</span><b><span id="mD">15</span> min</b></label>
+    <input type="range" id="mealD" min="5" max="120" step="5" value="15">
+  </div>
+  <div class="row2">
+    <button class="btn soft" data-close>Zurück</button>
+    <button class="btn" id="mealOK">Eintragen</button>
+  </div>
+</div></div>
+
+<!-- ══════════ SHEET: INSULIN ══════════ -->
+<div class="sheet" id="sheetBolus"><div class="panel">
+  <div class="grab"></div>
+  <h3>Insulin spritzen</h3>
+  <div class="field">
+    <label><span>Einheiten</span><b><span id="bU">4.0</span> U</b></label>
+    <input type="range" id="bolusU" min="0.5" max="15" step="0.5" value="4">
+  </div>
+  <p class="hint" id="bolusHint"></p>
+  <div class="row2">
+    <button class="btn soft" data-close>Zurück</button>
+    <button class="btn" id="bolusOK">Spritzen</button>
+  </div>
+</div></div>
+
+<!-- ══════════ AUSWERTUNG ══════════ -->
+
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════
+   TEIL 1 — SIMULATIONSKERN
+   Rein rechnend: kein DOM, keine Uhrzeit, kein Math.random.
+   Deterministisch bei gleichem Seed. PORT: 1:1 nach Swift uebersetzbar.
+   Integration: explizites Euler, dt = 1 min.
+
+   Struktur:
+     · hepatische Glukoseabgabe, insulinsupprimiert  -> der Wert steigt
+       wieder, sobald das Insulin abklingt
+     · renale Ausscheidung ab 180 mg/dL              -> Plateau statt Explosion
+     · Gegenregulation mit Kapazitaetsgrenze         -> rettet aus flachen
+       Dellen, aber nicht aus einer Ueberdosis
+   Referenzen: Bergman et al. 1979, Am J Physiol 236:E667;
+               Dalla Man, Rizza & Cobelli 2007, IEEE TBME 54(10):1740.
+   ══════════════════════════════════════════════════════════════════ */
+function makeRNG(seed){
+  let a = seed >>> 0;
+  const u = () => { a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  return { uniform:u, normal(){
+    const x = Math.max(u(), 1e-12), y = u();
+    return Math.sqrt(-2*Math.log(x)) * Math.cos(2*Math.PI*y); } };
+}
+
+const P = {
+  Vg:144.0, Vi:10.8, ke:0.138, tau_i:44.0, p2:0.055, SI:6.0572e-4,
+  p1:0.0006, Gb:110.0, EGPb:1.30, kL:180.0, kR:0.005,
+  kCR:0.008, Gcr:112.0, CRmax:0.50, Ksat:100.0, Ag:0.85,
+  tau_sens:12.0, basal:0.9/60,
+
+  // Grundumsatz im Wachzustand. Deshalb sinkt der Wert tagsueber von
+  // selbst und flacht nachts ab -- nicht wegen eines Zufallsrauschens.
+  kBase:0.0011,
+
+  // Bewegung
+  kWork:0.040,   // Muskelverbrauch waehrend der Belastung
+  kCat:1.80,     // Katecholamine, erst ab hoher Intensitaet
+  kSens:0.30,    // erste Nachwirkungswelle, Stunden
+  kLate:0.55,    // zweite Welle, Maximum nach etwa acht Stunden
+  tauZup:60.0, tauZ:240.0, tauQ:240.0, qIn:1/150,
+
+  // Leberglykogen
+  glyFast:1/480, glyWork:1/150, glyFill:0.0025,
+};
+
+/* Mahlzeitentypen. Fett verzoegert die Magenentleerung erheblich --
+   deshalb steigt tau von schnell nach fettig so stark an. */
+const MEAL_TYPES = {
+  fast:  { tau:20, label:"schnell"  },
+  mixed: { tau:40, label:"gemischt" },
+  fatty: { tau:75, label:"fettig"   },
+};
+
+/* ─────────────────────────────────────────────────────────────────────
+   Bewegungsereignisse. Alltagsbewegung kommt ohne Vorwarnung.
+   Trainingseinheiten kuendigen sich an -- darin liegt die Entscheidung.
+   ───────────────────────────────────────────────────────────────────── */
+const ALLTAG = [
+  {n:"Zur Uni gelaufen",    i:0.30, d:[18,32]},
+  {n:"Einkaufen",           i:0.25, d:[25,45]},
+  {n:"Rad zum Bahnhof",     i:0.42, d:[10,18]},
+  {n:"Treppenhaus",         i:0.45, d:[4,7]},
+  {n:"Wohnung geputzt",     i:0.28, d:[25,45]},
+  {n:"Bus verpasst",        i:0.68, d:[4,8]},
+  {n:"Spaziergang",         i:0.22, d:[30,55]},
+];
+const TRAINING = [
+  {n:"Basketballtraining",  i:0.75, d:[80,100], w:[35,50]},
+  {n:"Krafttraining",       i:0.58, d:[55,75],  w:[30,45]},
+  {n:"Dauerlauf",           i:0.55, d:[40,55],  w:[25,40]},
+  {n:"Intervalltraining",   i:0.92, d:[28,38],  w:[25,40]},
+  {n:"Punktspiel",          i:0.85, d:[70,90],  w:[40,60]},
+];
+
+/* Kombinationen, die nur aus dem Zusammentreffen mehrerer Zustaende
+   entstehen. Sie sind der eigentliche Grund, warum sich zwei Tage mit
+   scheinbar gleichen Entscheidungen voellig unterschiedlich verhalten. */
+const KOMBIS = {
+  heisshunger:  {t:"Heißhunger",       d:"Belastung bei fast leeren Reserven"},
+  doppelrisiko: {t:"Doppelrisiko",     d:"Alkohol nach Belastung — die Leber kann nicht gegensteuern"},
+  morgenwand:   {t:"Morgenwand",       d:"Schlafmangel und Stress verstärken das Dawn-Phänomen"},
+  ketonrisiko:  {t:"Ketonrisiko",      d:"Krankheit bei hohem Wert — Insulin wirkt schlechter"},
+  blindflug:    {t:"Blindflug",        d:"Nach kürzlicher Hypo fehlt die Gegenregulation"},
+  stressspirale:{t:"Stressspirale",    d:"Hoher Wert erzeugt Stress, Stress hält den Wert oben"},
+};
+
+class Engine {
+  constructor(seed = 20260812){
+    this.rng = makeRNG(seed);
+    const Ib = P.basal*1000/(P.Vi*P.ke);
+    this.s = {
+      t: 7*60,
+      D1:0, D2:0, tau_m:40, B1:0, B2:0,
+      S1:P.basal*P.tau_i, S2:P.basal*P.tau_i, Ip:Ib, Ib, X:0,
+      Z:0, Q1:0, Q2:0, Q3:0,            // Nachwirkung, erste und zweite Welle
+      gly:1,                             // Leberglykogen
+      haaf:0,                            // Gedaechtnis kuerzlicher Hypoglykaemien
+      stress:0, sleepDebt:0, ill:0, alc:0,
+      lowMin:0, highMin:0,               // Bilanz der Nacht
+      sensorDay:0,                       // Alter des Sensors in Tagen
+      emg:null, emgT:0,
+      G:110, Gi:110, noise:0, drift:0,
+    };
+    this.trace=[]; this.events=[]; this.meals=[]; this.acts=[];
+    this.lastSensor=110; this._bolus=0; this._boluses=[];
+    this._planned=-1; this.kombi={}; this._planDay(0);
+  }
+
+  /* ── Tagesplan ── */
+  _planDay(day){
+    if (this._planned >= day) return;
+    this._planned = day;
+    const R = this.rng, base = day*1440;
+    const pick = a => a[Math.floor(R.uniform()*a.length)];
+    const between = (a,b) => a + R.uniform()*(b-a);
+    const free = (st,du) => !this.acts.some(a =>
+      st < a.start + a.dur + 12 && a.start < st + du + 12);
+
+    if (R.uniform() < 0.88){
+      const e = pick(TRAINING);
+      this.acts.push({name:e.n, inten:e.i, logged:false, announced:false,
+        warn:Math.round(between(e.w[0],e.w[1])),
+        start:Math.round(base + between(15*60, 19*60)),
+        dur:Math.round(between(e.d[0],e.d[1]))});
+    }
+    let used = new Set();
+    const n = 6 + Math.floor(R.uniform()*3);
+    for (let k = 0; k < n; k++){
+      if (used.size >= ALLTAG.length) used = new Set();
+      let e = null;
+      for (let i = 0; i < 8; i++){ const c = pick(ALLTAG); if (!used.has(c.n)){ e = c; break; } }
+      if (!e) continue;
+      const du = Math.round(between(e.d[0], e.d[1]));
+      for (let i = 0; i < 22; i++){
+        const st = Math.round(base + between(7*60, 22.5*60));
+        if (!free(st, du)) continue;
+        used.add(e.n);
+        this.acts.push({name:e.n, inten:e.i, warn:0, logged:false, start:st, dur:du});
+        break;
+      }
+    }
+    this.acts.sort((a,b) => a.start - b.start);
+
+    // Krankheit: selten, mehrtaegig, wahrscheinlicher bei Schlafmangel und Stress
+    const risk = 0.05 + 0.14*this.s.sleepDebt + 0.10*this.s.stress;
+    if (day > 0 && R.uniform() < risk){
+      this._illUntil = base + Math.round(between(20*60, 62*60));
+      this.events.push({t:base + 7*60, kind:"state", name:"Erkältung", sev:"warn"});
+    }
+    // Alkohol: Abendereignis, Wirkung setzt verzoegert ein
+    if (R.uniform() < 0.20){
+      this._alcAt = base + Math.round(between(20*60, 23*60));
+      this._alcDone = false;
+    }
+  }
+
+  /* ── Nutzeraktionen ── */
+  logMeal(gEst, type, dur){
+    const gTrue = Math.max(0, gEst*Math.exp(0.24*this.rng.normal() + 0.06));
+    this.meals.push({tEnd:this.s.t + dur, dur, gTrue, gEst, tau:MEAL_TYPES[type].tau});
+    this.events.push({t:this.s.t, kind:"meal", est:gEst, truth:gTrue, type, dur});
+  }
+  injectBolus(U){
+    // Absorptionsvarianz. Wer oft in kurzer Zeit dieselbe Region nutzt,
+    // bekommt sie unberechenbarer -- vernarbtes Gewebe nimmt schlechter auf.
+    const recent = this._boluses.filter(t => this.s.t - t < 360).length;
+    const spread = 0.20 + 0.06*Math.min(4, recent);
+    const m = Math.max(.45, Math.min(1.55, 1 + spread*this.rng.normal()));
+    this._boluses.push(this.s.t);
+    this._bolus += U*m;
+    this.events.push({t:this.s.t, kind:"bolus", units:U, effective:U*m});
+  }
+
+  /* Wachheit: bestimmt den Grundverbrauch. Nachts faellt er fast weg,
+     deshalb flacht der Verlauf dann ab. */
+  _wake(h){
+    if (h >= 23 || h < 6) return 0.12;
+    if (h < 8)  return 0.12 + 0.88*(h - 6)/2;
+    if (h > 21) return 0.12 + 0.88*(23 - h)/2;
+    return 1;
+  }
+
+  step(){
+    const s = this.s, t = s.t, h = (t/60) % 24, day = Math.floor(t/1440);
+    this._planDay(day);
+
+    /* ── Bewegungsereignisse ── */
+    let Y = 0, act = null;
+    for (const a of this.acts){
+      if (!a.announced && a.warn && t >= a.start - a.warn && t < a.start){
+        a.announced = true;
+        s.stress = Math.min(1, s.stress + 0.10);
+        this.events.push({t, kind:"warn", name:a.name, inMin:a.warn});
+      }
+      if (t >= a.start && t < a.start + a.dur){
+        if (Y < a.inten){ Y = a.inten; act = a; }
+        if (!a.logged){ a.logged = true;
+          this.events.push({t, kind:"move", name:a.name, inten:a.inten, dur:a.dur}); }
+      }
+    }
+    this._Y = Y; this._act = act;
+
+    /* ── Nachwirkung: zwei Wellen ──
+       Die erste klingt ueber Stunden ab, die zweite hat ihr Maximum nach
+       etwa acht Stunden -- deshalb kippt Nachmittagstraining die Nacht.
+       Referenz: McMahon et al. 2007; Iscoe & Riddell 2011, Diabet Med. */
+    s.Z  += Y/P.tauZup - s.Z/P.tauZ;
+    s.Q1 += Y*P.qIn - s.Q1/P.tauQ;
+    s.Q2 += (s.Q1 - s.Q2)/P.tauQ;
+    s.Q3 += (s.Q2 - s.Q3)/P.tauQ;
+
+    /* ── Krankheit und Alkohol ── */
+    s.ill = (this._illUntil && t < this._illUntil)
+      ? Math.min(1, s.ill + 1/180) : Math.max(0, s.ill - 1/420);
+    if (this._alcAt && !this._alcDone && t >= this._alcAt){
+      this._alcDone = true; s.alc = 1;
+      this.events.push({t, kind:"state", name:"Alkohol", sev:"warn"});
+    }
+    if (s.alc > 0) s.alc = Math.max(0, s.alc - 1/540);   // wirkt etwa neun Stunden
+
+    /* ── Schlafbilanz: die Nacht bestimmt den Folgetag ── */
+    if (h >= 23 || h < 7){
+      if (s.G < 70)  s.lowMin++;
+      if (s.G > 250) s.highMin++;
+    }
+    if (Math.round(h*60) === 7*60){
+      s.sleepDebt = Math.min(1, (s.lowMin/90)*0.7 + (s.highMin/180)*0.5);
+      if (s.sleepDebt > 0.25)
+        this.events.push({t, kind:"state", name:"Schlecht geschlafen", sev:"warn"});
+      s.stress = Math.min(1, s.stress + 0.35*s.sleepDebt);
+      s.lowMin = 0; s.highMin = 0;
+      s.sensorDay++;
+      if (s.sensorDay >= 10){ s.sensorDay = 0; s.drift = 0;
+        this.events.push({t, kind:"state", name:"Neuer Sensor", sev:"ok"}); }
+    }
+
+    /* ── Gedaechtnis kuerzlicher Hypoglykaemien ──
+       Nach einer Unterzuckerung ist die Gegenregulation fuer Stunden bis
+       Tage geschwaecht. Deshalb ist die zweite Hypo gefaehrlicher als die
+       erste. Referenz: Cryer 2013, Diabetes 62(7):2188. */
+    s.haaf = s.G < 70 ? Math.min(1, s.haaf + 1/180) : Math.max(0, s.haaf - 1/1440);
+
+    /* ── Stress ── */
+    let dStress = -1/900;
+    if (s.G > 240) dStress += 1/700;
+    if (s.emg) dStress += 1/120;
+    s.stress = Math.max(0, Math.min(1, s.stress + dStress));
+
+    /* ── Kombinationen ── */
+    const K = this.kombi = {};
+    if (Y > 0.35 && s.gly < 0.28) K.heisshunger = 1;
+    if (s.alc > 0.25 && s.Z > 0.30) K.doppelrisiko = 1;
+    if (s.sleepDebt > 0.40 && s.stress > 0.40 && h > 3 && h < 10) K.morgenwand = 1;
+    if (s.ill > 0.30 && s.G > 250) K.ketonrisiko = 1;
+    if (s.haaf > 0.45 && Y > 0.25) K.blindflug = 1;
+    if (s.stress > 0.50 && s.G > 220) K.stressspirale = 1;
+    if (K.stressspirale) s.stress = Math.min(1, s.stress + 1/500);
+    for (const k in K) if (!this._seen || !this._seen[k]){
+      this._seen = this._seen || {};
+      this._seen[k] = t;
+      this.events.push({t, kind:"kombi", name:KOMBIS[k].t, key:k});
+    }
+    if (this._seen) for (const k in this._seen)
+      if (!K[k] && t - this._seen[k] > 120) delete this._seen[k];
+
+    /* ── Kohlenhydrate ── */
+    let rT = 0, rE = 0;
+    for (const m of this.meals)
+      if (t < m.tEnd){ rT += m.gTrue*1000/m.dur; rE += m.gEst*1000/m.dur; s.tau_m = m.tau; }
+    s.D1 += rT - s.D1/s.tau_m;  s.D2 += s.D1/s.tau_m - s.D2/s.tau_m;
+    s.B1 += rE - s.B1/s.tau_m;  s.B2 += s.B1/s.tau_m - s.B2/s.tau_m;
+    const Ra = P.Ag*s.D2/s.tau_m/P.Vg;
+
+    /* ── Insulin ── */
+    let u = P.basal;
+    if (this._bolus){ u += this._bolus; this._bolus = 0; }
+    s.S1 += u - s.S1/P.tau_i;
+    s.S2 += s.S1/P.tau_i - s.S2/P.tau_i;
+    s.Ip += s.S2/P.tau_i*1000/P.Vi - P.ke*s.Ip;
+    s.X  += -P.p2*s.X + P.p2*P.SI*(s.Ip - s.Ib);
+
+    /* ── Zirkadiane Schwingung, Mittelwert null ueber 24 h ── */
+    const amp  = 0.075*(1 + 0.28*Math.sin(day*2.399 + 1.1)) * (K.morgenwand ? 1.7 : 1);
+    const dawn = amp*Math.sin(2*Math.PI*(h + 1)/24);
+
+    /* ── Modifikatoren, multiplikativ und voneinander abhaengig ── */
+    const sens = (1 + P.kSens*s.Z + P.kLate*s.Q3*(K.doppelrisiko ? 1.5 : 1))
+               * (1 - 0.24*s.stress) * (1 - 0.20*s.sleepDebt)
+               * (1 - 0.34*s.ill) * (K.ketonrisiko ? 0.75 : 1);
+    const egpM = (0.78 + 0.22*s.gly)
+               * (1 + 0.20*s.stress + 0.25*s.ill)
+               * (1 - 0.30*s.alc);
+    const crM  = (0.18 + 0.82*s.gly) * (1 - 0.65*s.haaf)
+               * (1 - 0.55*s.alc) * (K.blindflug ? 0.4 : 1);
+
+    /* ── Glukosebilanz ── */
+    const Xp   = Math.max(0, s.X);
+    const Geff = s.G/(1 + s.G/P.Ksat);
+    const EGP  = egpM*P.EGPb/(1 + P.kL*Xp);
+    const ren  = P.kR*Math.max(0, s.G - 180);
+    const upt  = s.X*sens*Geff;
+    const base = P.kBase*this._wake(h)*Geff;                 // Grundverbrauch
+    const work = Y*(1 - 0.55*Math.max(0, Y - 0.6)/0.4);
+    const uex  = P.kWork*work*Geff;
+    const cat  = P.kCat*Math.max(0, Y - 0.6)/0.4*(1 + 0.3*s.stress);
+    const cr   = Math.min(P.CRmax*crM, P.kCR*Math.max(0, P.Gcr - s.G));
+
+    s.gly = Math.max(0, Math.min(1, s.gly
+      - P.glyFast*(0.35 + 0.65*this._wake(h))
+      - Y*P.glyWork*(K.heisshunger ? 1.6 : 1)
+      - (s.ill > 0.3 ? 1/900 : 0)
+      + Ra*P.glyFill));
+
+    s.G += EGP - P.EGPb - ren - upt - uex - base + cat
+         - P.p1*(s.G - P.Gb) + Ra + dawn + cr;
+    s.G  = Math.max(20, s.G);
+
+    /* ── Grenzwerte ──
+       Unter 40 mg/dL verliert man das Bewusstsein und kann nicht mehr
+       selbst handeln. Ueber 400 droht die Ketoazidose. Beides beendet den
+       Lauf nicht, kostet aber Zeit und steht in der Auswertung. */
+    if (!s.emg && s.G <= 40){
+      s.emg = "out"; s.emgT = t;
+      this.events.push({t, kind:"emg", name:"Bewusstlos", sev:"low"});
+    } else if (!s.emg && s.G >= 400){
+      s.emg = "dka"; s.emgT = t;
+      this.events.push({t, kind:"emg", name:"Notaufnahme, Ketoazidose", sev:"high"});
+    }
+    if (s.emg === "out" && t - s.emgT >= 18){
+      s.G += 4.2; s.gly = Math.min(1, s.gly + 0.005);
+      if (s.G > 95){ s.emg = null;
+        this.events.push({t, kind:"emg", name:"stabilisiert", sev:"ok"}); }
+    } else if (s.emg === "dka" && t - s.emgT >= 25){
+      s.G -= 2.4;
+      if (s.G < 210){ s.emg = null;
+        this.events.push({t, kind:"emg", name:"stabilisiert", sev:"ok"}); }
+    }
+
+    s.Gi += (s.G - s.Gi)/P.tau_sens;
+    s.t += 1;
+    if (s.t % 5 === 0) this._sample();
+  }
+
+  /* Sensorfehler waechst im Tiefen, bei schneller Aenderung -- und am
+     Anfang wie am Ende der Tragedauer. */
+  _sample(){
+    const s = this.s, n = this.trace.length;
+    const rate = n ? (s.Gi - this.trace[n-1].gi)/5 : 0;
+    let sig = 0.055;
+    if (s.Gi < 80) sig *= 1 + (80 - s.Gi)/40;
+    sig *= 1 + Math.min(1.2, Math.abs(rate)/2.5);
+    sig *= 1 + 0.5*Math.max(0, 1 - s.sensorDay) + 0.4*Math.max(0, (s.sensorDay - 7)/2);
+    if (this.kombi.blindflug) sig *= 1.4;
+
+    s.noise = 0.82*s.noise + 0.5724*this.rng.normal();
+    s.drift = Math.max(-.05, Math.min(.05, s.drift + 0.004*this.rng.normal()));
+    const v = Math.max(40, Math.min(400, Math.round(s.Gi*(1 + s.drift)*(1 + sig*s.noise))));
+    this.lastSensor = v;
+    this.trace.push({t:s.t, G:s.G, gi:s.Gi, sensor:v, born:performance.now()});
+  }
+
+  /* ── Anzeigezustaende ── */
+  activity(){
+    const t = this.s.t;
+    if (this._act){ const a = this._act;
+      return {mode:"live", name:a.name, inten:a.inten,
+              left:a.start + a.dur - t, done:(t - a.start)/a.dur}; }
+    let next = null;
+    for (const a of this.acts)
+      if (a.warn && t < a.start && t >= a.start - a.warn && (!next || a.start < next.start)) next = a;
+    if (next) return {mode:"soon", name:next.name, inten:next.inten,
+                      inMin:next.start - t, dur:next.dur,
+                      done:1 - (next.start - t)/next.warn};
+    if (this.s.Z > 0.10 || this.s.Q3 > 0.08) return {mode:"after"};
+    return {mode:"idle"};
+  }
+  states(){
+    const s = this.s, h = (s.t/60) % 24, out = [];
+    const add = (k,v,txt) => { if (v > 0.12) out.push({k, v:Math.min(1,v), txt}); };
+    if (h >= 23 || h < 6) out.push({k:"nacht", v:1, txt:"Nacht"});
+    add("nach1", s.Z*1.2,            "Nachwirkung");
+    add("nach2", s.Q3*2.0,           "Späte Welle");
+    add("stress", s.stress,          "Stress");
+    add("schlaf", s.sleepDebt,       "Schlafmangel");
+    add("krank", s.ill,              "Krank");
+    add("alk", s.alc,                "Alkohol");
+    add("haaf", s.haaf,              "Hypo-Gedächtnis");
+    if (s.sensorDay >= 8) out.push({k:"sensor", v:.7, txt:"Sensor alt"});
+    for (const k in this.kombi) out.push({k, v:1, txt:KOMBIS[k].t, kombi:true});
+    return out;
+  }
+  iob(){ return Math.max(0, this.s.S1 + this.s.S2 - 2*P.basal*P.tau_i); }
+  cob(){ return Math.max(0, (this.s.B1 + this.s.B2)/1000); }
+  trend(){ const n=this.trace.length; return n<4?0:(this.trace[n-1].sensor-this.trace[n-4].sensor)/15; }
+  tir(){ if(!this.trace.length) return null;
+    return this.trace.filter(p=>p.sensor>=70&&p.sensor<=180).length/this.trace.length; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TEIL 2 — DARSTELLUNG (beim Swift-Port ersetzen, nicht uebersetzen)
+   ══════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+let C = {};
+function readTheme(){
+  const g = getComputedStyle(document.documentElement);
+  const v = n => g.getPropertyValue(n).trim();
+  C = { ink:v("--ink"), low:v("--low"), high:v("--high"),
+        rgbInk:v("--rgb-ink"), rgbCard:v("--rgb-card") };
+}
+readTheme();
+const col = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const lerp = (a,b,k) => a + (b-a)*k;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+const eng = new Engine();
+let speed = 60, rangeH = 3, viewH = 3, tSub = 0, lastTS = 0, lastCount = 0, uiFade = 0;
+
+/* ─── Pager: Wischen und Ziehen ───────────────────────────────── */
+const pager = $("pager"), pHome = $("pHome"), pSim = $("pSim"), pRev = $("pRev");
+const PAGES = [pHome, pSim, pRev];
+const FOGS  = [null, $("fogSim"), $("fogRev")];
+const LAST  = PAGES.length - 1;
+let page = 0, prog = 0;            // prog 0 = Home, 1 = Simulator
+let drag = null;
+
+const SLIVER = 26;   // px, die von der darunterliegenden Ebene stehen bleiben
+
+function applyProg(p){
+  prog = p;
+  // Ebenenstapel: jede Seite legt sich ueber die vorige und laesst links
+  // einen Streifen frei. Was darunter liegt, verschwimmt -- sichtbar, aber
+  // nicht ablenkend, und man sieht sofort, wo es zurueckgeht.
+  const w = pager.clientWidth || 1;
+  PAGES.forEach((el, i) => {
+    const rest = i === 0 ? 0 : SLIVER;
+    const d = p - i;
+    // Vor der Ankunft von rechts hereinschieben, danach den Streifen
+    // wieder abgeben, sobald die naechste Ebene sich darueberlegt.
+    const x = d <= 0 ? rest + (-d)*(w - rest) : rest*(1 - Math.min(d, 1));
+    const under = clamp(d, 0, 1);
+    if (i > 0) el.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
+    // Nur die unmittelbar darunterliegende Ebene wird unscharf gerechnet.
+    // Tiefere sind ohnehin verdeckt -- zwei gleichzeitige Vollbild-Weichzeichner
+    // waren die Ursache fuer das Ruckeln beim Wechsel zur Auswertung.
+    el.style.filter  = (under < .004 || d > 1.02) ? "none"
+                     : `blur(${(under*9).toFixed(2)}px)`;
+    el.style.opacity = String(1 - .28*Math.min(under, 1));
+    el.style.pointerEvents = Math.round(clamp(p,0,LAST)) === i ? "auto" : "none";
+    const f = FOGS[i];
+    if (f){
+      f.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
+      f.style.opacity   = String(Math.pow(clamp(i - p, 0, 1), .85));
+    }
+  });
+  [...$("rail").children].forEach(b => {
+    if (b.dataset.p !== undefined)
+      b.setAttribute("aria-current", String(Math.round(clamp(p,0,LAST)) === +b.dataset.p));
+  });
+}
+function snapTo(target){
+  page = clamp(target, 0, LAST);
+  PAGES.forEach(el => el.classList.add("snap"));
+  FOGS.forEach(f => f && f.classList.add("snap"));
+  applyProg(page);
+  if (page === 2) setTimeout(updateReview, 590);
+  clearTimeout(snapTo._t);
+  snapTo._t = setTimeout(() => {
+    PAGES.forEach(el => el.classList.remove("snap"));
+    FOGS.forEach(f => f && f.classList.remove("snap"));
+  }, 580);
+}
+/* Auf dem Desktop beginnt der Browser sofort eine Textmarkierung, sobald
+   die Maus gedrueckt gehalten und bewegt wird. Drei Gegenmassnahmen:
+   das Standardverhalten auf nicht-interaktiven Flaechen unterdruecken,
+   waehrend des Ziehens jede Markierbarkeit abschalten, und eine bereits
+   angefangene Markierung beim Umschalten in den Zieh-Modus verwerfen. */
+const INTERACTIVE = "button, input, a, textarea, select, [role=button], .swipe";
+
+pager.addEventListener("dragstart", e => e.preventDefault());
+
+pager.addEventListener("pointerdown", e => {
+  if (e.target.closest("input[type=range], .sheet, .screen")) return;
+  if (e.pointerType === "mouse" && !e.target.closest(INTERACTIVE)) e.preventDefault();
+  drag = {x:e.clientX, y:e.clientY, t:performance.now(), lock:null,
+          base:page, last:e.clientX, v:0, moved:false};
+});
+
+pager.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.lock){
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    drag.lock = Math.abs(dx) > Math.abs(dy)*1.15 ? "x" : "y";
+    if (drag.lock === "x"){
+      pager.setPointerCapture(e.pointerId);
+      document.body.classList.add("dragging");
+      const sel = getSelection();
+      if (sel && !sel.isCollapsed) sel.removeAllRanges();   // die ersten 8 px zuruecknehmen
+    }
+  }
+  if (drag.lock !== "x") return;
+  e.preventDefault();
+  drag.moved = true;
+  const now = performance.now();
+  drag.v = (e.clientX - drag.last)/Math.max(1, now - drag.t);
+  drag.last = e.clientX; drag.t = now;
+  let p = drag.base - dx/pager.clientWidth;
+  if (p < 0) p = p*0.32;                        // Gummiband an den Raendern
+  if (p > 1) p = 1 + (p-1)*0.32;
+  applyProg(clamp(p, -0.12, LAST + 0.12));
+});
+
+/* Endet ein Zug auf einer Karte oder einem Knopf, soll der folgende
+   Klick nicht mehr ausgeloest werden. */
+let swallowClick = false;
+document.addEventListener("click", e => {
+  if (!swallowClick) return;
+  swallowClick = false;
+  e.stopPropagation(); e.preventDefault();
+}, true);
+
+function endDrag(){
+  if (!drag) return;
+  const wasX = drag.lock === "x", moved = drag.moved, v = drag.v, base = drag.base;
+  drag = null;
+  document.body.classList.remove("dragging");
+  if (!wasX) return;
+  if (moved){
+    swallowClick = true;
+    const sel = getSelection();
+    if (sel && !sel.isCollapsed) sel.removeAllRanges();
+  }
+  if (v < -0.45) return snapTo(base + 1);
+  if (v >  0.45) return snapTo(base - 1);
+  snapTo(Math.round(clamp(prog, 0, LAST)));
+}
+pager.addEventListener("pointerup", endDrag);
+pager.addEventListener("pointercancel", endDrag);
+pager.addEventListener("lostpointercapture", endDrag);
+$("rail").onclick = e => {
+  const b = e.target.closest("button[data-p]"); if (b) snapTo(+b.dataset.p);
+};
+const root = document.documentElement;
+$("theme").setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
+$("theme").onclick = () => {
+  root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+  $("theme").setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
+  requestAnimationFrame(() => { readTheme(); paint(eng.s.t); });
+};
+// Sicherheitsnetz: Schriften und Stylesheets koennen nach dem Skript fertig
+// werden. Dann sind die Token-Werte erst jetzt zuverlaessig auslesbar.
+addEventListener("load", () => { readTheme(); paint(eng.s.t); });
+if (document.fonts) document.fonts.ready.then(() => { readTheme(); paint(eng.s.t); });
+$("swipeCta").onclick = () => snapTo(1);
+// Ein Klick auf einen freigelegten Streifen springt auf diese Ebene zurueck.
+PAGES.forEach((el, i) =>
+  el.addEventListener("click", () => { if (Math.round(prog) > i) snapTo(i); }, true));
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") snapTo(page + 1);
+  if (e.key === "ArrowLeft")  snapTo(page - 1);
+  if (e.key === "Escape") closeSheets();
+});
+applyProg(0);
+
+/* ─── Segmentregler mit gleitendem Knopf ──────────────────────── */
+function moveKnob(seg){
+  const on = seg.querySelector('button[aria-pressed="true"]');
+  const knob = seg.querySelector(".knob");
+  if (!on || !knob) return;
+  knob.style.width = on.offsetWidth + "px";
+  knob.style.transform = `translateX(${on.offsetLeft - 3}px)`;
+}
+function wireSeg(seg, onPick){
+  seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    [...seg.querySelectorAll("button")].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    moveKnob(seg); onPick(b);
+  });
+  requestAnimationFrame(() => moveKnob(seg));
+}
+wireSeg($("ranges"), b => rangeH = +b.dataset.h);
+wireSeg($("speed"),  b => speed  = +b.dataset.x);
+let mealType = "fast";
+wireSeg($("mealType"), b => mealType = b.dataset.t);
+
+/* ─── Aufklappbare Karten ─────────────────────────────────────── */
+$("facts").addEventListener("click", e => {
+  const f = e.target.closest(".fact"); if (!f) return;
+  const open = f.getAttribute("aria-expanded") === "true";
+  f.setAttribute("aria-expanded", String(!open));
+});
+$("facts").addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const f = e.target.closest(".fact"); if (!f) return;
+  e.preventDefault();
+  f.setAttribute("aria-expanded", String(f.getAttribute("aria-expanded") !== "true"));
+});
+
+/* ─── Chart ───────────────────────────────────────────────────── */
+function drawChart(cv, pts, hours, tNow, opts={}){
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const c = cv.getContext("2d");
+  c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,w,h);
+
+  const padL = 10, padR = 44, padT = 14, padB = 22;
+  const LAG = P.tau_sens, t0 = tNow - hours*60, gLo = 40, gHi = 400;
+  const X = t => padL + (t-t0)/(hours*60)*(w-padL-padR);
+  const Y = g => h - padB - (Math.log(g/gLo)/Math.log(gHi/gLo))*(h-padT-padB);
+
+  c.fillStyle = `rgba(${C.rgbInk},.06)`;
+  c.fillRect(padL, Y(180), w-padL-padR, Y(70)-Y(180));
+
+  for (const [g,cc,al] of [[70,C.low,.9],[180,C.high,.78],[250,C.high,.3]]){
+    c.strokeStyle = cc; c.globalAlpha = al; c.lineWidth = 1.2;
+    c.setLineDash(g===250 ? [3,4] : []);
+    c.beginPath(); c.moveTo(padL, Y(g)+.5); c.lineTo(w-padR, Y(g)+.5); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = cc; c.font = "500 10px 'DM Mono',monospace"; c.textAlign = "left";
+    c.fillText(String(g), w-padR+8, Y(g)+3.5); c.globalAlpha = 1;
+  }
+
+  /* ═══ SIGNATUR — die Nebelzone ══════════════════════════════════
+     Der letzte Messpunkt sitzt dort, wo er physiologisch hingehoert:
+     zwoelf Minuten in der Vergangenheit. Der Schleier rechts davon ist
+     die Gegenwart deines Koerpers, ueber die keine Information
+     existiert. Kein reales CGM zeigt das. Genau deshalb steht es hier. */
+  if (!opts.review){
+    const xf = X(tNow-LAG), xn = X(tNow);
+    const gr = c.createLinearGradient(xf, 0, xn, 0);
+    gr.addColorStop(0,  `rgba(${C.rgbCard},0)`);
+    gr.addColorStop(.5, `rgba(${C.rgbCard},.74)`);
+    gr.addColorStop(1,  `rgba(${C.rgbCard},.98)`);
+    c.fillStyle = gr; c.fillRect(xf, padT-8, xn-xf, h-padT-padB+10);
+    c.strokeStyle = `rgba(${C.rgbInk},.22)`; c.lineWidth = 1; c.setLineDash([2,3]);
+    c.beginPath(); c.moveTo(xf+.5, padT-6); c.lineTo(xf+.5, h-padB); c.stroke();
+    c.setLineDash([]);
+    c.save(); c.translate(xf+(xn-xf)/2+1, padT+28); c.rotate(-Math.PI/2);
+    c.fillStyle = `rgba(${C.rgbInk},.5)`;
+    c.font = "500 8.5px 'DM Mono',monospace"; c.textAlign = "center";
+    c.fillText("N E B E L", 0, 3); c.restore();
+  }
+
+  if (opts.review){
+    c.strokeStyle = C.low; c.lineWidth = 2; c.lineJoin = "round"; c.beginPath();
+    let go = false;
+    for (const p of pts){
+      if (p.t < t0) continue;
+      const x = X(p.t), y = Y(p.G);
+      go ? c.lineTo(x,y) : (c.moveTo(x,y), go = true);
+    }
+    c.stroke();
+  }
+
+  const shift = opts.review ? 0 : LAG, now = performance.now();
+  for (const p of pts){
+    const tt = p.t - shift;
+    if (tt < t0 || tt > tNow) continue;
+    const age = Math.min(1, (now - p.born)/620);
+    c.globalAlpha = opts.review ? .9 : (0.22 + 0.78*age);
+    c.fillStyle = p.sensor < 70 ? C.low : p.sensor > 180 ? C.high : C.ink;
+    c.beginPath(); c.arc(X(tt), Y(p.sensor), 2.5*(0.5+0.5*age), 0, 6.284); c.fill();
+    c.globalAlpha = 1;
+  }
+
+  c.fillStyle = `rgba(${C.rgbInk},.55)`;
+  c.font = "400 10px 'DM Mono',monospace"; c.textAlign = "center";
+  const stp = hours<=3 ? 1 : hours<=6 ? 2 : hours<=12 ? 3 : 6;
+  for (let tt = Math.ceil(t0/60/stp)*stp*60; tt <= tNow; tt += stp*60){
+    if (X(tt) < padL+14 || X(tt) > w-padR-8) continue;
+    c.fillText(String(Math.floor((tt/60)%24)).padStart(2,"0")+":00", X(tt), h-5);
+  }
+}
+
+/* ─── Anzeige ─────────────────────────────────────────────────── */
+const fmtT = t => String(Math.floor((t/60)%24)).padStart(2,"0")+":"+String(t%60).padStart(2,"0");
+
+function paint(tNow){
+  const v = eng.lastSensor, el = $("bg");
+  if (eng.trace.length !== lastCount){
+    lastCount = eng.trace.length;
+    el.textContent = v;
+    el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse");
+    renderLog();
+  }
+  const tone = v < 70 ? C.low : v > 180 ? C.high : C.ink;
+  el.style.color = tone;
+  $("arrow").style.transform = `rotate(${clamp(eng.trend()*30, -90, 90)}deg)`;
+  $("arrow").style.color = tone;
+
+  const mins = Math.floor(tNow) % 1440, day = Math.floor(tNow/1440)+1;
+  const hhmm = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+  $("clock").textContent = hhmm;
+  $("dayLabel").textContent = "Tag " + day;
+  $("ctaSub").textContent = eng.trace.length > 1
+    ? `läuft seit ${eng.trace.length*5} Minuten · ${hhmm}`
+    : "nach links wischen oder ziehen";
+  $("iob").textContent = eng.iob().toFixed(1)+" U";
+  $("cob").textContent = Math.round(eng.cob())+" g";
+  const t = eng.tir();
+  $("tir").textContent = t === null ? "—" : Math.round(t*100)+" %";
+
+  uiFade = lerp(uiFade, clamp((72-v)/26, 0, 1), .045);
+  document.documentElement.style.setProperty("--fade", uiFade.toFixed(3));
+  $("behind").textContent = uiFade > .4 ? "schwer zu lesen" : "dein Körper vor etwa zwölf Minuten";
+
+  // Zustandsanzeigen brauchen keine 60 Bilder pro Sekunde.
+  if ((frame++ & 7) === 0){ paintMove(); paintReserve(); paintChips(); paintCrit(); }
+  viewH = lerp(viewH, rangeH, .12);
+  if (prog > 0.02 && prog < LAST) drawChart($("chart"), eng.trace, viewH, tNow);
+  // Erst wenn die Ebene wirklich steht, sonst faellt der Neuaufbau
+  // mitten in die laufende Animation.
+  if (prog > 1.985 && performance.now() - lastRev > 1200){
+    lastRev = performance.now(); updateReview();
+  }
+}
+
+let lastRev = -1e9, lastMoveKey = "", lastRes = -1, frame = 0;
+
+let lastChips = "", lastCrit = "";
+
+function paintCrit(){
+  const emg = eng.s.emg, key = emg || "";
+  if (key === lastCrit) return;
+  lastCrit = key;
+  const el = $("crit");
+  if (!emg){ el.hidden = true; }
+  else {
+    el.hidden = false;
+    el.className = "crit " + (emg === "out" ? "lo" : "hi");
+    $("critTxt").textContent = emg === "out" ? "Bewusstlos" : "Notaufnahme";
+  }
+  // Handlungsunfähig: wer bewusstlos ist, kann nicht spritzen oder essen.
+  const dead = emg === "out";
+  ["btnMeal","btnBolus"].forEach(id => $(id).disabled = dead);
+}
+
+function paintChips(){
+  const st = eng.states();
+  const key = st.map(x => x.k + (x.v > .5 ? "H" : "L")).join(",");
+  if (key === lastChips) return;
+  lastChips = key;
+  $("chips").innerHTML = st.map(x =>
+    `<li class="chip ${x.kombi ? "kombi" : x.k}"><i style="opacity:${(0.35 + 0.65*x.v).toFixed(2)}"></i>${x.txt}</li>`
+  ).join("");
+}
+
+function paintReserve(){
+  const g = eng.s.gly, pct = Math.round(g*100);
+  if (pct === lastRes) return;
+  lastRes = pct;
+  const el = $("reserve");
+  el.className = "reserve" + (g < 0.32 ? " low" : "");
+  $("resBar").style.width = pct + "%";
+  $("resVal").textContent = pct + " %";
+  $("resLabel").textContent = g < 0.32 ? "Reserven · iss etwas" : "Reserven";
+}
+const LOADBARS = n => Array.from({length:4}, (_,k) =>
+  `<i class="${k < n ? "on" : ""}"></i>`).join("");
+
+let lastMoveHTML = "";
+function paintMove(){
+  const a = eng.activity(), card = $("moveCard");
+  const key = a.mode + (a.name || "");
+  const lvl = i => i <= .35 ? 1 : i <= .55 ? 2 : i <= .78 ? 3 : 4;
+  const word = i => i <= .35 ? "leicht" : i <= .55 ? "moderat" : i <= .78 ? "fordernd" : "hart";
+  let cls = "move", beat = false, bar = -1;
+  // Nur schreiben, wenn sich etwas geaendert hat. Vorher lief bei jedem
+  // Einzelbild ein innerHTML-Schreibvorgang -- das allein hat gestottert.
+  const stamp = key + "|" + (a.left|0) + "|" + (a.inMin|0);
+  const fresh = stamp !== lastMoveHTML;
+  lastMoveHTML = stamp;
+
+  if (a.mode === "live"){
+    cls += " live"; beat = true; bar = a.done*100;
+    if (fresh){
+      $("mvName").textContent = a.name;
+      $("mvWhen").textContent = `noch ${Math.ceil(a.left)} min`;
+      $("mvSub").innerHTML = `<span class="load">${LOADBARS(lvl(a.inten))}</span> &nbsp;${word(a.inten)} · läuft gerade`;
+    }
+  } else if (a.mode === "soon"){
+    cls += " soon"; beat = true; bar = a.done*100;
+    if (fresh){
+      $("mvName").textContent = a.name;
+      $("mvWhen").textContent = `in ${Math.ceil(a.inMin)} min`;
+      $("mvSub").innerHTML = `<span class="load">${LOADBARS(lvl(a.inten))}</span> &nbsp;${word(a.inten)} · ${a.dur} min — jetzt wäre die Zeit zu entscheiden`;
+    }
+  } else if (a.mode === "after"){
+    if (fresh){
+      $("mvName").textContent = "Nachwirkung";
+      $("mvWhen").textContent = "";
+      $("mvSub").textContent = "Nach der Belastung wirkt Insulin stärker. Hält Stunden an.";
+    }
+  } else {
+    if (fresh){
+      $("mvName").textContent = "Nichts geplant";
+      $("mvWhen").textContent = "";
+      $("mvSub").textContent = "Alltagsbewegung kündigt sich nicht an.";
+    }
+  }
+
+  if (key !== lastMoveKey){
+    lastMoveKey = key;
+    card.classList.remove("fresh"); void card.offsetWidth;
+    if (a.mode === "live" || a.mode === "soon") card.classList.add("fresh");
+  }
+  card.className = cls + (card.classList.contains("fresh") ? " fresh" : "");
+  $("mvBeat").style.display = beat ? "block" : "none";
+  $("mvBarWrap").style.display = bar >= 0 ? "block" : "none";
+  if (bar >= 0) $("mvBar").style.width = clamp(bar, 0, 100).toFixed(1) + "%";
+}
+function renderLog(){
+  const line = e => {
+    if (e.kind === "meal") return `${e.est} g ${MEAL_TYPES[e.type].label} · ${e.dur} min`;
+    if (e.kind === "bolus") return `${e.units.toFixed(1)} U gespritzt`;
+    if (e.kind === "warn") return `${e.name} in ${e.inMin} min angekündigt`;
+    if (e.kind === "emg") return e.name;
+    if (e.kind === "state") return e.name;
+    if (e.kind === "kombi") return `${e.name} — ${KOMBIS[e.key].d}`;
+    return `${e.name} · ${e.dur} min`;
+  };
+  $("logList").innerHTML = eng.events.slice(-14).reverse()
+    .map(e => `<li><b>${fmtT(e.t)}</b><span>${line(e)}</span></li>`).join("")
+    || `<li><b>—</b><span>noch nichts passiert</span></li>`;
+}
+
+function loop(ts){
+  if (!lastTS) lastTS = ts;
+  const dt = Math.min(250, ts - lastTS); lastTS = ts;
+  if (speed > 0){
+    tSub += dt*speed/60000;
+    let n = Math.min(320, Math.floor(tSub)); tSub -= n;
+    while (n-- > 0) eng.step();
+  }
+  paint(eng.s.t + (speed > 0 ? tSub : 0));
+  requestAnimationFrame(loop);
+}
+
+/* ─── Sheets ──────────────────────────────────────────────────── */
+const closeSheets = () => document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on"));
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheets);
+document.querySelectorAll(".sheet").forEach(s => s.onclick = e => { if (e.target === s) closeSheets(); });
+
+/* Hypoglykaemie verlangsamt die Bedienung. Das ist kein Effekt,
+   das ist das Symptom. */
+const guarded = fn => () => { const d = uiFade*700; d > 40 ? setTimeout(fn, d) : fn(); };
+
+$("btnMeal").onclick = guarded(() => {
+  $("sheetMeal").classList.add("on");
+  requestAnimationFrame(() => moveKnob($("mealType")));
+});
+$("btnBolus").onclick = guarded(() => {
+  const i = eng.iob(), hint = $("bolusHint");
+  hint.className = "hint" + (i > 1.2 ? " warn" : "");
+  hint.textContent = i > 1.2
+    ? `${i.toFixed(1)} U wirken noch. Was du jetzt spritzt, kommt oben drauf.`
+    : "Wirkbeginn nach zehn bis zwanzig Minuten, Maximum nach etwa neunzig.";
+  $("sheetBolus").classList.add("on");
+});
+$("btnRescue").onclick = guarded(() => { eng.logMeal(15,"fast",5); closeSheets(); renderLog(); });
+$("mealG").oninput = e => $("mG").textContent = e.target.value;
+$("mealD").oninput = e => $("mD").textContent = e.target.value;
+$("mealOK").onclick = () => { eng.logMeal(+$("mealG").value, mealType, +$("mealD").value); closeSheets(); renderLog(); };
+$("bolusU").oninput = e => $("bU").textContent = (+e.target.value).toFixed(1);
+$("bolusOK").onclick = () => { eng.injectBolus(+$("bolusU").value); closeSheets(); renderLog(); };
+
+/* ─── Auswertung ──────────────────────────────────────────────── */
+let revStamp = "";
+function updateReview(){
+  const tr = eng.trace; if (!tr.length) return;
+  const n = tr.length;
+  $("rTir").textContent = Math.round(tr.filter(p=>p.sensor>=70&&p.sensor<=180).length/n*100)+" %";
+  $("rLow").textContent = Math.round(tr.filter(p=>p.G<70).length/n*100)+" %";
+  $("rAvg").textContent = Math.round(tr.reduce((a,p)=>a+p.G,0)/n);
+  $("rDec").textContent = eng.events.filter(e => e.kind === "meal" || e.kind === "bolus").length;
+  $("rEmg").textContent = eng.events.filter(e => e.kind === "emg" && e.sev !== "ok").length;
+  const mard = tr.reduce((a,p) => a + Math.abs(p.sensor - p.G)/p.G, 0)/n;
+  $("rMard").textContent = (mard*100).toFixed(1) + " %";
+  $("revTitle").textContent = "Tag " + (Math.floor(eng.s.t/1440)+1);
+  const stamp = eng.events.length + ":" + tr.length;
+  if (stamp !== revStamp){
+  revStamp = stamp;
+  $("revList").innerHTML = eng.events.slice().reverse().map(e => {
+    if (e.kind === "meal"){
+      const d = Math.round(e.truth - e.est);
+      const cl = Math.abs(d) >= 10 ? ' class="miss"' : '';
+      return `<li><b>${fmtT(e.t)}</b><span${cl}>${e.est} g geschätzt · tatsächlich ${Math.round(e.truth)} g (${d>=0?"+":"−"}${Math.abs(d)})</span></li>`;
+    }
+    if (e.kind === "move")
+      return `<li><b>${fmtT(e.t)}</b><span>${e.name} · ${e.dur} min · Belastung ${(e.inten*100).toFixed(0)} %</span></li>`;
+    if (e.kind === "kombi")
+      return `<li><b>${fmtT(e.t)}</b><span class="miss">${e.name} — ${KOMBIS[e.key].d}</span></li>`;
+    if (e.kind === "emg")
+      return `<li><b>${fmtT(e.t)}</b><span class="miss">${e.name}</span></li>`;
+    if (e.kind === "state")
+      return `<li><b>${fmtT(e.t)}</b><span>${e.name}</span></li>`;
+    if (e.kind === "warn") return "";
+    const p = Math.round((e.effective/e.units-1)*100);
+    const cl = Math.abs(p) >= 15 ? ' class="miss"' : '';
+    return `<li><b>${fmtT(e.t)}</b><span${cl}>${e.units.toFixed(1)} U · aufgenommen ${p>=0?"+":""}${p} %</span></li>`;
+  }).join("") || `<li><b>—</b><span>keine Entscheidungen protokolliert</span></li>`;
+  }
+  drawChart($("revChart"), eng.trace, Math.max(6, rangeH), eng.s.t, {review:true});
+}
+
+/* ─── Start ───────────────────────────────────────────────────── */
+eng._sample(); renderLog();
+addEventListener("resize", () => {
+  applyProg(prog); moveKnob($("ranges")); moveKnob($("speed")); moveKnob($("mealType"));
+  paint(eng.s.t);
+});
+document.addEventListener("visibilitychange", () => { lastTS = 0; });
+requestAnimationFrame(loop);
+
+/* ══════════════════════════════════════════════════════════════════
+   VALIDIERUNG — Referenzwerte der kalibrierten Engine
+   Erzeugt mit identischen Gleichungen in Python, Rauschen deaktiviert,
+   Start 110 mg/dL sofern nicht anders angegeben. Diese Tabelle ist der
+   Test-Oracle fuer den Swift-Port: gleiche Parameter, gleiche Szenarien,
+   dieselben Zahlen -- sonst ist der Port falsch.
+
+   Szenario                         Maximum       Minimum      nach 5 h
+   ---------------------------------------------------------------------
+   nuechtern, nur Basal             112           110          112
+   1 U ab 110                       110            73 @160'     91
+   1 U ab 250                       250           121          126
+   3 U ab 250  (Ueberkorrektur)     250            68 @219'     78
+   50 g schnell, kein Insulin       314 @147'     110          254
+   50 g + 5 U zeitgleich            186 @ 88'     104          105
+   50 g + 5 U Prebolus -15 min      165 @114'     106          111
+   50 g + 5 U verspaetet +20 min    217 @ 83'      96           97
+   80 g fettig, 45 min, + 8 U       199 @156'      88 @ 54'    160
+   50 g + 8 U  (Ueberdosis)         159            66 @255'     69
+   50 g + 5 U, dann 2 U nach 60'    185            68 @281'     68
+   15 g Traubenzucker ab 55          --            55          158
+   30 g ab 60 (Ueberbehandlung)     221 @169'      60          204
+
+   Abgeleitete Therapiegroessen: ISF 38.7 mg/dL/U bei 110 · 62.3 bei 250
+                                 KE-Faktor 10 g/U (Kalibrierungsvorgabe)
+
+   Didaktisch entscheidend und korrekt abgebildet:
+     · Prebolus 165  <  zeitgleich 186  <  verspaetet 217
+       Das Timing schlaegt die Dosis.
+     · Fettige Mahlzeit: Fruehabsturz auf 88, Spaetgipfel nach 2.5 h,
+       nach 7 h immer noch 149. Der Pizza-Effekt.
+     · Ueberdosis und Stacking fuehren beide in echte Hypoglykaemien.
+       Die Gegenregulation faengt flache Dellen ab, nicht diese.
+     · Ueberbehandlung einer Hypo mit 30 g endet bei 221.
+
+   BEWEGUNG -- Start 140 mg/dL, nur Basal, Belastung ab Minute 20:
+
+   Ereignis                          nach 30'  nach 60'  nach 120'  nach 360'
+   ---------------------------------------------------------------------------
+   30' Gehen         (0.30)             132       119        119        117
+   45' Radfahren     (0.45)             128       100        103        111
+   60' Dauerlauf     (0.55)             126        93         88        109
+   90' Basketball    (0.75)             132       113         93        110
+   30' HIIT          (0.95)             144       151        150        144
+
+   Moderate Ausdauer senkt, hochintensive Belastung treibt zunaechst nach
+   oben -- Katecholamine und anaerober Stoffwechsel. Beides ist real und
+   ueberrascht Betroffene regelmaessig.
+
+   FAKTORSYSTEM -- alle Groessen wirken multiplikativ aufeinander:
+
+   Faktor                Wirkung                             Quelle
+   ---------------------------------------------------------------------------
+   Grundverbrauch        senkt tagsueber ~4 mg/dL/h, nachts fast null
+   Leberglykogen         leer -> weniger EGP UND schwache Gegenregulation
+   Nachwirkung 1. Welle  Insulinempfindlichkeit +, Stunden
+   Nachwirkung 2. Welle  Maximum nach 8-11 h                 [1][2]
+   Hypo-Gedaechtnis      nach Unterzuckerung Gegenregulation -65 %   [3]
+   Schlafqualitaet       naechtliche Ausschlaege -> Folgetag resistenter
+   Stress                EGP +20 %, Insulinwirkung -24 %
+   Krankheit             EGP +25 %, Insulinwirkung -34 %, mehrtaegig
+   Alkohol               Gluconeogenese -30 %, Gegenregulation -55 %
+   Sensoralter           Fehler steigt an Tag 1 und ab Tag 8
+   Injektionsstelle      Streuung waechst bei haeufiger Nutzung
+
+   KOMBINATIONEN -- entstehen nur aus dem Zusammentreffen mehrerer Faktoren:
+   Heisshunger, Doppelrisiko, Morgenwand, Ketonrisiko, Blindflug,
+   Stressspirale. Belegt am Beispiel Doppelrisiko, gleiche Mahlzeiten und
+   Dosen, Tiefstwert der Nacht:
+
+     ohne alles ................. 107 mg/dL
+     Nachmittagstraining ........  85 mg/dL
+     Alkohol abends .............  87 mg/dL
+     beides zusammen ............  38 mg/dL  -> Bewusstlosigkeit
+
+   Das ist der Kern: keiner der beiden Faktoren allein ist gefaehrlich.
+
+   SPIELBARKEIT -- drei Tage, drei Mahlzeiten taeglich mit passendem Bolus,
+   Traubenzucker unter 80: Zeit im Ziel 68-93 %, keine Notfaelle.
+   Mit 20 % zu hohem Bolus: 6-38 % unter 70, zwei bis acht Notfaelle.
+
+   Tagesschwingung ohne Eingaben: Maximum gegen fuenf Uhr morgens, ueber
+   drei Tage stabil und ohne Aufsummierung.
+
+   [1] Iscoe & Riddell 2011, Diabet Med -- verzoegerte naechtliche Hypo
+       nach intermittierend hochintensiver Belastung
+   [2] McMahon et al. 2007, J Clin Endocrinol Metab -- biphasischer
+       Glukosebedarf, sofort und 7-11 h nach der Einheit
+   [3] Cryer 2013, Diabetes 62(7):2188 -- hypoglykaemie-assoziiertes
+       autonomes Versagen
+   [4] Yardley et al. / Dalla Man, Breton & Cobelli 2009,
+       J Diabetes Sci Technol 3(1):56 -- Belastung im Kompartimentmodell
+   [5] Brown A., diaTribe: 42 Factors That Affect Blood Glucose --
+       Uebersicht der praxisrelevanten Einflussgroessen
+
+   NICHT ENTHALTEN (bewusst, Phase 3): Herzfrequenz aus HealthKit statt
+   simulierter Ereignisse, Koffein, Dehydratation, Pumpenmodus,
+   verzoegerter Bolus, Benachrichtigungen, Basalanpassung, Absagen einer
+   geplanten Einheit.
+   ══════════════════════════════════════════════════════════════════ */
+</script>
+</body>
+</html>

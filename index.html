@@ -205,7 +205,7 @@ html[data-theme="dark"] .tgl .moon{color:var(--paper)}
 }
 .seg button{
   position:relative; z-index:1; flex:1; border:0; background:transparent; cursor:pointer;
-  font-family:var(--mono); font-size:11.5px; color:var(--ink2); height:30px; padding:0 11px;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink2); height:30px; padding:0 8px;
   transition:color .3s var(--spring); white-space:nowrap;
 }
 .seg button[aria-pressed="true"]{color:var(--paper)}
@@ -249,6 +249,17 @@ canvas{width:100%; height:206px; display:block; touch-action:pan-y}
 .crit.lo #critAmb, .crit.hi #critSkull{display:none}
 .crit svg{animation:beat 1.7s ease-in-out infinite}
 
+.split{
+  font-family:var(--mono); font-size:12px; color:var(--ink); margin:-6px 0 14px;
+  padding:11px 14px; background:var(--sink); border-radius:12px;
+  font-variant-numeric:tabular-nums;
+}
+.loadrow{
+  display:flex; align-items:center; gap:11px; margin-top:12px;
+  font-size:12.5px; color:var(--ink2);
+}
+.loadrow .load i{height:16px; width:5px}
+
 /* ─── Zustandschips ─── */
 .chips{
   list-style:none; margin:0; padding:0;
@@ -286,6 +297,9 @@ canvas{width:100%; height:206px; display:block; touch-action:pan-y}
   font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums;
   min-width:40px; text-align:right; transition:color .5s var(--spring);
 }
+.reserve.hungry{box-shadow:inset 0 0 0 1.8px var(--high), var(--sh)}
+.reserve.hungry .rbar b, .reserve.hungry .rv{background:var(--high); color:var(--high)}
+.reserve.hungry .rk{color:var(--high)}
 .reserve.low{box-shadow:inset 0 0 0 1.8px var(--low), var(--sh)}
 .reserve.low .rbar b, .reserve.low .rv{background:var(--low); color:var(--low)}
 .reserve.low .rk{color:var(--low)}
@@ -565,6 +579,7 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
     <div class="actions">
       <button class="btn" id="btnMeal">Essen</button>
       <button class="btn" id="btnBolus">Insulin</button>
+      <button class="btn soft wide" id="btnMove">Bewegung starten</button>
     </div>
 
     <div class="move" id="moveCard">
@@ -581,8 +596,9 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
       <div class="eyebrow" style="margin:0 0 9px">Tempo</div>
       <div class="seg" id="speed">
         <span class="knob"></span>
-        <button data-x="0">Pause</button>
+        <button data-x="0">❙❙</button>
         <button data-x="1">1×</button>
+        <button data-x="20">20×</button>
         <button data-x="60" aria-pressed="true">60×</button>
         <button data-x="300">300×</button>
       </div>
@@ -672,6 +688,32 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
   </div>
 </div></div>
 
+<!-- ══════════ SHEET: BEWEGUNG ══════════ -->
+<div class="sheet" id="sheetMove"><div class="panel">
+  <div class="grab"></div>
+  <h3>Bewegung starten</h3>
+  <div class="field">
+    <label><span>Belastung</span><b id="mvLoadTxt">moderat</b></label>
+    <div class="seg tall" id="moveInt">
+      <span class="knob"></span>
+      <button data-i="0.28" aria-pressed="false">Leicht</button>
+      <button data-i="0.50" aria-pressed="true">Moderat</button>
+      <button data-i="0.72" aria-pressed="false">Fordernd</button>
+      <button data-i="0.92" aria-pressed="false">Hart</button>
+    </div>
+    <div class="loadrow"><span class="load" id="mvLoadBars"></span><span id="mvLoadHint"></span></div>
+  </div>
+  <div class="field">
+    <label><span>Dauer</span><b><span id="mvDurTxt">45</span> min</b></label>
+    <input type="range" id="moveDur" min="5" max="120" step="5" value="45">
+  </div>
+  <p class="hint">Keine Vorwarnung, kein Countdown. Was du vorbereiten wolltest, musst du vorher getan haben.</p>
+  <div class="row2">
+    <button class="btn soft" data-close>Zurück</button>
+    <button class="btn" id="moveOK">Los</button>
+  </div>
+</div></div>
+
 <!-- ══════════ SHEET: INSULIN ══════════ -->
 <div class="sheet" id="sheetBolus"><div class="panel">
   <div class="grab"></div>
@@ -680,6 +722,21 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radiu
     <label><span>Einheiten</span><b><span id="bU">4.0</span> U</b></label>
     <input type="range" id="bolusU" min="0.5" max="15" step="0.5" value="4">
   </div>
+  <div class="field">
+    <label><span>Aufteilung</span></label>
+    <div class="seg tall" id="bolusSplit">
+      <span class="knob"></span>
+      <button data-s="1" aria-pressed="true">Sofort</button>
+      <button data-s="0.7">70/30</button>
+      <button data-s="0.5">50/50</button>
+      <button data-s="0.3">30/70</button>
+    </div>
+  </div>
+  <div class="field" id="bolusOverWrap" hidden>
+    <label><span>Rest verteilt über</span><b><span id="bOverTxt">90</span> min</b></label>
+    <input type="range" id="bolusOver" min="30" max="240" step="15" value="90">
+  </div>
+  <p class="split" id="bolusSplitTxt"></p>
   <p class="hint" id="bolusHint"></p>
   <div class="row2">
     <button class="btn soft" data-close>Zurück</button>
@@ -736,7 +793,7 @@ const P = {
   tauZup:60.0, tauZ:240.0, tauQ:240.0, qIn:1/150,
 
   // Leberglykogen
-  glyFast:1/480, glyWork:1/150, glyFill:0.0025,
+  glyFast:1/480, glyWork:1/150, glyFill:0.0025, glyDawn:0.0075,
 };
 
 /* Mahlzeitentypen. Fett verzoegert die Magenentleerung erheblich --
@@ -798,7 +855,7 @@ class Engine {
       G:110, Gi:110, noise:0, drift:0,
     };
     this.trace=[]; this.events=[]; this.meals=[]; this.acts=[];
-    this.lastSensor=110; this._bolus=0; this._boluses=[];
+    this.lastSensor=110; this._bolus=0; this._boluses=[]; this._ext=[];
     this._planned=-1; this.kombi={}; this._planDay(0);
   }
 
@@ -856,15 +913,32 @@ class Engine {
     this.meals.push({tEnd:this.s.t + dur, dur, gTrue, gEst, tau:MEAL_TYPES[type].tau});
     this.events.push({t:this.s.t, kind:"meal", est:gEst, truth:gTrue, type, dur});
   }
-  injectBolus(U){
+  /* Selbst gestartete Einheit. Sie kommt ohne Vorwarnung -- wer sich
+     nicht vorher vorbereitet hat, muss waehrenddessen reagieren. */
+  startActivity(inten, dur){
+    const names = ["Leichte Bewegung","Moderate Einheit","Fordernde Einheit","Harte Einheit"];
+    const i = inten <= .35 ? 0 : inten <= .58 ? 1 : inten <= .80 ? 2 : 3;
+    this.acts.push({name:names[i], inten, warn:0, logged:false,
+                    start:this.s.t, dur, self:true});
+    this.acts.sort((a,b) => a.start - b.start);
+  }
+  /* Bolus, wahlweise aufgeteilt. Ein Teil geht sofort, der Rest wird
+     ueber die angegebene Dauer gleichmaessig abgegeben. Bei fettigen
+     Mahlzeiten kommen die Kohlenhydrate erst spaet an -- ein normaler
+     Bolus wirkt dann zu frueh und der Wert steigt Stunden spaeter
+     trotzdem. Pumpen nennen das verzoegerten oder dualen Bolus. */
+  injectBolus(U, share = 1, over = 0){
     // Absorptionsvarianz. Wer oft in kurzer Zeit dieselbe Region nutzt,
     // bekommt sie unberechenbarer -- vernarbtes Gewebe nimmt schlechter auf.
     const recent = this._boluses.filter(t => this.s.t - t < 360).length;
     const spread = 0.20 + 0.06*Math.min(4, recent);
     const m = Math.max(.45, Math.min(1.55, 1 + spread*this.rng.normal()));
     this._boluses.push(this.s.t);
-    this._bolus += U*m;
-    this.events.push({t:this.s.t, kind:"bolus", units:U, effective:U*m});
+    const eff = U*m;
+    this._bolus += eff*share;
+    if (share < 1 && over > 0)
+      this._ext.push({rate: eff*(1 - share)/over, until: this.s.t + over});
+    this.events.push({t:this.s.t, kind:"bolus", units:U, effective:eff, share, over});
   }
 
   /* Wachheit: bestimmt den Grundverbrauch. Nachts faellt er fast weg,
@@ -970,6 +1044,8 @@ class Engine {
     /* ── Insulin ── */
     let u = P.basal;
     if (this._bolus){ u += this._bolus; this._bolus = 0; }
+    for (const e of this._ext) if (t < e.until) u += e.rate;
+    if (this._ext.length) this._ext = this._ext.filter(e => t < e.until);
     s.S1 += u - s.S1/P.tau_i;
     s.S2 += s.S1/P.tau_i - s.S2/P.tau_i;
     s.Ip += s.S2/P.tau_i*1000/P.Vi - P.ke*s.Ip;
@@ -1001,8 +1077,13 @@ class Engine {
     const cat  = P.kCat*Math.max(0, Y - 0.6)/0.4*(1 + 0.3*s.stress);
     const cr   = Math.min(P.CRmax*crM, P.kCR*Math.max(0, P.Gcr - s.G));
 
+    // Die naechtliche Mehrabgabe der Leber speist sich aus dem Glykogen.
+    // Deshalb ist der Speicher am Morgen am niedrigsten -- man wacht
+    // hungrig auf, nicht weil eine Uhr das sagt, sondern weil die Leber
+    // die halbe Nacht gearbeitet hat.
     s.gly = Math.max(0, Math.min(1, s.gly
       - P.glyFast*(0.35 + 0.65*this._wake(h))
+      - Math.max(0, dawn)*P.glyDawn
       - Y*P.glyWork*(K.heisshunger ? 1.6 : 1)
       - (s.ill > 0.3 ? 1/900 : 0)
       + Ra*P.glyFill));
@@ -1085,7 +1166,12 @@ class Engine {
     for (const k in this.kombi) out.push({k, v:1, txt:KOMBIS[k].t, kombi:true});
     return out;
   }
-  iob(){ return Math.max(0, this.s.S1 + this.s.S2 - 2*P.basal*P.tau_i); }
+  iob(){
+    // Noch nicht abgegebenes Insulin aus verzoegerten Anteilen zaehlt mit,
+    // sonst unterschaetzt man, was noch kommt.
+    const pending = this._ext.reduce((a,e) => a + e.rate*Math.max(0, e.until - this.s.t), 0);
+    return Math.max(0, this.s.S1 + this.s.S2 - 2*P.basal*P.tau_i) + pending;
+  }
   cob(){ return Math.max(0, (this.s.B1 + this.s.B2)/1000); }
   trend(){ const n=this.trace.length; return n<4?0:(this.trace[n-1].sensor-this.trace[n-4].sensor)/15; }
   tir(){ if(!this.trace.length) return null;
@@ -1383,7 +1469,10 @@ function paint(tNow){
   }
   const tone = v < 70 ? C.low : v > 180 ? C.high : C.ink;
   el.style.color = tone;
-  $("arrow").style.transform = `rotate(${clamp(eng.trend()*30, -90, 90)}deg)`;
+  // Der Pfeil zeigt nach oben bei Anstieg, nach unten bei Abfall und
+  // waagerecht bei stabilem Verlauf -- so wie es jedes CGM handhabt.
+  // Das SVG zeigt nach oben, deshalb der Versatz von 90 Grad.
+  $("arrow").style.transform = `rotate(${90 - clamp(eng.trend()*30, -90, 90)}deg)`;
   $("arrow").style.color = tone;
 
   const mins = Math.floor(tNow) % 1440, day = Math.floor(tNow/1440)+1;
@@ -1413,9 +1502,10 @@ function paint(tNow){
   }
 }
 
-let lastRev = -1e9, lastMoveKey = "", lastRes = -1, frame = 0;
+let lastRev = -1e9, lastMoveKey = "", lastRes = "", frame = 0;
 
 let lastChips = "", lastCrit = "";
+const LOADBARS = n => Array.from({length:4}, (_,k) => `<i class="${k < n ? "on" : ""}"></i>`).join("");
 
 function paintCrit(){
   const emg = eng.s.emg, key = emg || "";
@@ -1444,18 +1534,23 @@ function paintChips(){
 }
 
 function paintReserve(){
-  const g = eng.s.gly, pct = Math.round(g*100);
-  if (pct === lastRes) return;
-  lastRes = pct;
-  const el = $("reserve");
-  el.className = "reserve" + (g < 0.32 ? " low" : "");
+  const g = eng.s.gly, pct = Math.round(g*100), h = (eng.s.t/60) % 24;
+  // Der Speicher ist morgens am tiefsten, weil die Leber die halbe Nacht
+  // gearbeitet hat. Die Beschriftung sagt, was das gerade bedeutet.
+  let label = "Reserven", cls = "";
+  if (g < 0.30){ label = "Reserven · iss etwas"; cls = " low"; }
+  else if (h >= 6 && h < 10.5 && g < 0.70){ label = "Reserven · hungrig aufgewacht"; cls = " hungry"; }
+  else if (eng.s.Z > 0.22 && g < 0.62){ label = "Reserven · nachtanken"; cls = " hungry"; }
+  else if (h >= 11 && h < 14.5 && g < 0.60){ label = "Reserven · Mittagszeit"; cls = " hungry"; }
+  else if (h >= 17.5 && h < 21 && g < 0.55){ label = "Reserven · Abendessen"; cls = " hungry"; }
+  const key = pct + cls;
+  if (key === lastRes) return;
+  lastRes = key;
+  $("reserve").className = "reserve" + cls;
   $("resBar").style.width = pct + "%";
   $("resVal").textContent = pct + " %";
-  $("resLabel").textContent = g < 0.32 ? "Reserven · iss etwas" : "Reserven";
+  $("resLabel").textContent = label;
 }
-const LOADBARS = n => Array.from({length:4}, (_,k) =>
-  `<i class="${k < n ? "on" : ""}"></i>`).join("");
-
 let lastMoveHTML = "";
 function paintMove(){
   const a = eng.activity(), card = $("moveCard");
@@ -1510,7 +1605,9 @@ function paintMove(){
 function renderLog(){
   const line = e => {
     if (e.kind === "meal") return `${e.est} g ${MEAL_TYPES[e.type].label} · ${e.dur} min`;
-    if (e.kind === "bolus") return `${e.units.toFixed(1)} U gespritzt`;
+    if (e.kind === "bolus") return e.share >= 1
+      ? `${e.units.toFixed(1)} U gespritzt`
+      : `${e.units.toFixed(1)} U · ${Math.round(e.share*100)} % sofort, Rest über ${e.over} min`;
     if (e.kind === "warn") return `${e.name} in ${e.inMin} min angekündigt`;
     if (e.kind === "emg") return e.name;
     if (e.kind === "state") return e.name;
@@ -1552,15 +1649,56 @@ $("btnBolus").onclick = guarded(() => {
   hint.className = "hint" + (i > 1.2 ? " warn" : "");
   hint.textContent = i > 1.2
     ? `${i.toFixed(1)} U wirken noch. Was du jetzt spritzt, kommt oben drauf.`
-    : "Wirkbeginn nach zehn bis zwanzig Minuten, Maximum nach etwa neunzig.";
+    : "Wirkbeginn nach zehn bis zwanzig Minuten, Maximum nach etwa neunzig. Bei fettigem Essen kommen die Kohlenhydrate später — dann lohnt sich eine Aufteilung.";
+  paintBolusSheet();
   $("sheetBolus").classList.add("on");
+  requestAnimationFrame(() => moveKnob($("bolusSplit")));
 });
+let moveInt = 0.50;
+const LOADWORD = i => i <= .35 ? "leicht" : i <= .58 ? "moderat" : i <= .80 ? "fordernd" : "hart";
+const LOADLVL  = i => i <= .35 ? 1 : i <= .58 ? 2 : i <= .80 ? 3 : 4;
+const LOADHINT = i => i <= .35 ? "senkt langsam"
+                    : i <= .58 ? "senkt deutlich"
+                    : i <= .80 ? "senkt stark, zehrt an den Reserven"
+                    : "treibt erst hoch, dann tief";
+function paintMoveSheet(){
+  $("mvLoadTxt").textContent = LOADWORD(moveInt);
+  $("mvLoadBars").innerHTML = LOADBARS(LOADLVL(moveInt));
+  $("mvLoadHint").textContent = LOADHINT(moveInt);
+}
+wireSeg($("moveInt"), b => { moveInt = +b.dataset.i; paintMoveSheet(); });
+$("moveDur").oninput = e => $("mvDurTxt").textContent = e.target.value;
+$("btnMove").onclick = guarded(() => {
+  paintMoveSheet();
+  $("sheetMove").classList.add("on");
+  requestAnimationFrame(() => moveKnob($("moveInt")));
+});
+$("moveOK").onclick = () => {
+  eng.startActivity(moveInt, +$("moveDur").value);
+  closeSheets(); renderLog();
+};
+
 $("btnRescue").onclick = guarded(() => { eng.logMeal(15,"fast",5); closeSheets(); renderLog(); });
 $("mealG").oninput = e => $("mG").textContent = e.target.value;
 $("mealD").oninput = e => $("mD").textContent = e.target.value;
 $("mealOK").onclick = () => { eng.logMeal(+$("mealG").value, mealType, +$("mealD").value); closeSheets(); renderLog(); };
-$("bolusU").oninput = e => $("bU").textContent = (+e.target.value).toFixed(1);
-$("bolusOK").onclick = () => { eng.injectBolus(+$("bolusU").value); closeSheets(); renderLog(); };
+let bolusShare = 1;
+function paintBolusSheet(){
+  const U = +$("bolusU").value, over = +$("bolusOver").value;
+  $("bU").textContent = U.toFixed(1);
+  $("bOverTxt").textContent = over;
+  $("bolusOverWrap").hidden = bolusShare >= 1;
+  $("bolusSplitTxt").textContent = bolusShare >= 1
+    ? `${U.toFixed(1)} U auf einmal`
+    : `${(U*bolusShare).toFixed(1)} U sofort · ${(U*(1-bolusShare)).toFixed(1)} U über ${over} min`;
+}
+wireSeg($("bolusSplit"), b => { bolusShare = +b.dataset.s; paintBolusSheet(); });
+$("bolusU").oninput = paintBolusSheet;
+$("bolusOver").oninput = paintBolusSheet;
+$("bolusOK").onclick = () => {
+  eng.injectBolus(+$("bolusU").value, bolusShare, +$("bolusOver").value);
+  closeSheets(); renderLog();
+};
 
 /* ─── Auswertung ──────────────────────────────────────────────── */
 let revStamp = "";
@@ -1595,7 +1733,8 @@ function updateReview(){
     if (e.kind === "warn") return "";
     const p = Math.round((e.effective/e.units-1)*100);
     const cl = Math.abs(p) >= 15 ? ' class="miss"' : '';
-    return `<li><b>${fmtT(e.t)}</b><span${cl}>${e.units.toFixed(1)} U · aufgenommen ${p>=0?"+":""}${p} %</span></li>`;
+    const sp = e.share >= 1 ? "" : ` · ${Math.round(e.share*100)}/${Math.round((1-e.share)*100)} über ${e.over} min`;
+    return `<li><b>${fmtT(e.t)}</b><span${cl}>${e.units.toFixed(1)} U${sp} · aufgenommen ${p>=0?"+":""}${p} %</span></li>`;
   }).join("") || `<li><b>—</b><span>keine Entscheidungen protokolliert</span></li>`;
   }
   drawChart($("revChart"), eng.trace, Math.max(6, rangeH), eng.s.t, {review:true});
@@ -1705,10 +1844,55 @@ requestAnimationFrame(loop);
    [5] Brown A., diaTribe: 42 Factors That Affect Blood Glucose --
        Uebersicht der praxisrelevanten Einflussgroessen
 
+   TAGESRHYTHMUS DER RESERVEN -- drei Mahlzeiten um 8, 13 und 19 Uhr:
+
+     02:00  81 %      10:00  69 %      18:00  81 %
+     04:00  65 %      12:00  65 %      20:00  84 %
+     06:00  48 %      14:00  76 %      22:00 100 %
+     08:00  25 %      16:00 100 %      00:00  92 %
+
+   Tiefpunkt kurz vor dem Fruehstueck, im Mittel 37-42 % beim Aufwachen.
+   Grund ist nicht eine Uhr, sondern die naechtliche Mehrabgabe der Leber:
+   sie speist sich aus dem Glykogen. Man wacht hungrig auf, weil das
+   Organ die halbe Nacht gearbeitet hat.
+
+   SELBST GESTARTETE EINHEITEN -- 45 min ab 140 mg/dL, ohne Insulin:
+
+     leicht    (28 %)   140 -> 112 -> 97 nach 3 h
+     moderat   (50 %)   140 ->  94 -> 92
+     fordernd  (72 %)   140 -> 104 -> 92
+     hart      (92 %)   140 -> 147 -> 110
+
+   Dass fordernd weniger senkt als moderat, ist kein Fehler: oberhalb
+   etwa 60 % Belastung verschiebt sich der Stoffwechsel ins Anaerobe und
+   Katecholamine wirken dagegen. Moderate Dauerbelastung senkt am
+   staerksten -- das ueberrascht Betroffene regelmaessig.
+
+   VERZOEGERTER BOLUS -- fettige Mahlzeit, 80 g ueber 45 min Essdauer,
+   langsame Magenentleerung, jeweils 8 U, Rauschen deaktiviert:
+
+     Aufteilung              Maximum  Minimum   nach 3 h  nach 7 h
+     ---------------------------------------------------------------
+     alles sofort              187      88        137       185
+     70 / 30 ueber  90 min     166      97        134       164
+     50 / 50 ueber 120 min     142     103        140       140
+     30 / 70 ueber 180 min     173     100        173       104
+
+   Ohne Aufteilung wirkt das Insulin, bevor die Kohlenhydrate ankommen:
+   erst faellt der Wert auf 88, Stunden spaeter steht er bei 185. Mit
+   50/50 ueber zwei Stunden bleibt die Kurve nahezu flach. Zu weit
+   verzoegert kippt es in die andere Richtung.
+
+   Gegenprobe, schnelle Mahlzeit 50 g mit 5 U -- hier schadet die
+   Aufteilung: Maximum 290 statt 269, Tiefstwert 36 statt 70. Der
+   verzoegerte Anteil trifft auf laengst verdaute Kohlenhydrate.
+
+   TRENDPFEIL -- Winkel nach CGM-Konvention, Rate in mg/dL pro Minute:
+   +3 senkrecht hoch, 0 waagerecht, -3 senkrecht runter.
+
    NICHT ENTHALTEN (bewusst, Phase 3): Herzfrequenz aus HealthKit statt
    simulierter Ereignisse, Koffein, Dehydratation, Pumpenmodus,
-   verzoegerter Bolus, Benachrichtigungen, Basalanpassung, Absagen einer
-   geplanten Einheit.
+   Benachrichtigungen, Basalanpassung, Absagen einer geplanten Einheit.
    ══════════════════════════════════════════════════════════════════ */
 </script>
 </body>
